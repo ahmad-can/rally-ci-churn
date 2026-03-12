@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rally-ci-churn"
+version = "0.1.0"
+description = "Rally plugins and tooling for autonomous OpenStack benchmark scenarios"
+requires-python = ">=3.12"
+dependencies = [
+  "jinja2>=3.1.0",
+  "openstacksdk>=4.0.0",
+  "pyyaml>=6.0.0",
+]
+
+[project.entry-points.rally_plugins]
+path = "rally_ci_churn.plugins"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

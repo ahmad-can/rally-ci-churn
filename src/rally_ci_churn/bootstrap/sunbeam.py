@@ -1,0 +1,240 @@
+"""Sunbeam-oriented bootstrap helper."""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import base64
+import json
+import os
+import shlex
+import stat
+import subprocess
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+import yaml
+
+
+DEFAULT_SCENARIO = "autonomous_vm"
+
+
+def _run_openstack(clouds_yaml: Path, cloud_name: str, *args: str) -> str:
+    env = os.environ.copy()
+    env["OS_CLIENT_CONFIG_FILE"] = str(clouds_yaml)
+    env["OS_CLOUD"] = cloud_name
+    command = env.get("RALLY_CI_CHURN_OPENSTACK_BIN", "openstack")
+    result = subprocess.run(
+        [command, *args],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+    return result.stdout.strip()
+
+
+def _pick_exact_or_prefix(names: list[str], exact: tuple[str, ...], prefix: str) -> str:
+    for candidate in exact:
+        if candidate in names:
+            return candidate
+    for name in names:
+        if name.startswith(prefix):
+            return name
+    raise RuntimeError(f"Unable to choose a value from {names!r}")
+
+
+def _resolve_cacert(source_path: Path, value: str) -> str:
+    if not value:
+        return ""
+    candidate = Path(value).expanduser()
+    if candidate.is_file():
+        return str(candidate.resolve())
+    relative_candidate = (source_path.parent / value).resolve()
+    if relative_candidate.is_file():
+        return str(relative_candidate)
+    basename_candidate = (source_path.parent / candidate.name).resolve()
+    if basename_candidate.is_file():
+        return str(basename_candidate)
+    return ""
+
+
+def _normalize_clouds(source_path: Path) -> dict[str, object]:
+    config = yaml.safe_load(source_path.read_text(encoding="utf-8")) or {}
+    for cloud_name in ("sunbeam", "sunbeam-admin"):
+        cloud_entry = config.get("clouds", {}).get(cloud_name)
+        if isinstance(cloud_entry, dict):
+            cloud_entry["cacert"] = _resolve_cacert(source_path, str(cloud_entry.get("cacert", "")))
+    return config
+
+
+def _select_sunbeam_dns(clouds_yaml: Path) -> list[str]:
+    subnets = json.loads(_run_openstack(clouds_yaml, "sunbeam", "subnet", "list", "-f", "json", "-c", "ID", "-c", "Name", "-c", "Network"))
+    networks = json.loads(_run_openstack(clouds_yaml, "sunbeam", "network", "list", "-f", "json", "-c", "ID", "-c", "Name"))
+    network_ids_by_name = {network["Name"]: network["ID"] for network in networks}
+    preferred_subnet_id = ""
+    for subnet_name in ("gtestos-subnet",):
+        for subnet in subnets:
+            if subnet.get("Name") == subnet_name:
+                preferred_subnet_id = subnet["ID"]
+                break
+    if not preferred_subnet_id:
+        network_id = network_ids_by_name.get("gtestos-network")
+        if network_id:
+            for subnet in subnets:
+                if subnet.get("Network") == network_id:
+                    preferred_subnet_id = subnet["ID"]
+                    break
+    if not preferred_subnet_id and len(subnets) == 1:
+        preferred_subnet_id = subnets[0]["ID"]
+    if not preferred_subnet_id:
+        return []
+    raw = _run_openstack(clouds_yaml, "sunbeam", "subnet", "show", "-f", "value", "-c", "dns_nameservers", preferred_subnet_id)
+    if not raw:
+        return []
+    try:
+        return list(ast.literal_eval(raw))
+    except (SyntaxError, ValueError):
+        return []
+
+
+def _build_autonomous_vm_args(clouds_yaml: Path, config: dict[str, object]) -> dict[str, object]:
+    sunbeam = config["clouds"]["sunbeam"]
+    sunbeam_admin = config["clouds"]["sunbeam-admin"]
+    image_names = _run_openstack(clouds_yaml, "sunbeam-admin", "image", "list", "-f", "value", "-c", "Name").splitlines()
+    flavor_names = _run_openstack(clouds_yaml, "sunbeam-admin", "flavor", "list", "-f", "value", "-c", "Name").splitlines()
+    external_networks = _run_openstack(clouds_yaml, "sunbeam-admin", "network", "list", "--external", "-f", "value", "-c", "Name").splitlines()
+    image_name = _pick_exact_or_prefix([name for name in image_names if name], ("ubuntu",), "ubuntu")
+    flavor_name = _pick_exact_or_prefix([name for name in flavor_names if name], ("m1.tiny", "m1.small"), "m1.")
+    if "external-network" in external_networks:
+        external_network = "external-network"
+    elif len([name for name in external_networks if name]) == 1:
+        external_network = [name for name in external_networks if name][0]
+    else:
+        raise RuntimeError(f"Unable to determine external network from {external_networks!r}")
+    external_network_id = _run_openstack(clouds_yaml, "sunbeam-admin", "network", "show", "-f", "value", "-c", "id", external_network)
+    swift_cacert = str(sunbeam.get("cacert", "") or "")
+    swift_cacert_b64 = ""
+    if swift_cacert:
+        swift_cacert_b64 = base64.b64encode(Path(swift_cacert).read_bytes()).decode("ascii")
+    return {
+        "title": "Rally CI churn",
+        "description": "Autonomous CI-like runner churn without floating IPs",
+        "scenario": {
+            "family": "autonomous_vm",
+            "name": "CIChurn.boot_autonomous_vm",
+            "waves": 1,
+            "concurrency": 1,
+            "timeout_seconds": 3600,
+            "timeout_mode": "fail",
+            "console_log_length": 400,
+        },
+        "cloud": {
+            "image_name": image_name,
+            "flavor_name": flavor_name,
+            "external_network_name": external_network,
+            "external_network_id": external_network_id,
+        },
+        "network": {
+            "dns_nameservers": _select_sunbeam_dns(clouds_yaml),
+        },
+        "storage": {
+            "artifact_container": "rally-ci-churn",
+            "artifact_ttl_seconds": 0,
+            "swift_auth_url": sunbeam["auth"]["auth_url"],
+            "swift_username": sunbeam["auth"]["username"],
+            "swift_password": sunbeam["auth"]["password"],
+            "swift_project_name": sunbeam["auth"]["project_name"],
+            "swift_user_domain_name": sunbeam["auth"]["user_domain_name"],
+            "swift_project_domain_name": sunbeam["auth"]["project_domain_name"],
+            "swift_interface": "public",
+            "swift_region_name": sunbeam.get("region_name", "") or "",
+            "swift_cacert": swift_cacert,
+            "swift_cacert_b64": swift_cacert_b64,
+        },
+        "workload": {
+            "profile": "smoke",
+            "params": {},
+        },
+        "image_prep": {
+            "base_image_name": image_name,
+            "build_image_name": f"{image_name}-rally-build",
+            "build_image_flavor_name": flavor_name,
+        },
+    }
+
+
+def _write_adminrc(path: Path, admin_cloud: dict[str, object]) -> None:
+    auth = admin_cloud["auth"]
+    auth_url = str(auth["auth_url"])
+    lines = [
+        "# Generated by rally_ci_churn.bootstrap.sunbeam",
+        "unset OS_CLOUD",
+        "export OS_AUTH_TYPE=password",
+        "export OS_IDENTITY_API_VERSION=3",
+        f"export OS_AUTH_URL={shlex.quote(auth_url)}",
+        f"export OS_USERNAME={shlex.quote(str(auth['username']))}",
+        f"export OS_PASSWORD={shlex.quote(str(auth['password']))}",
+        f"export OS_PROJECT_NAME={shlex.quote(str(auth['project_name']))}",
+        f"export OS_USER_DOMAIN_NAME={shlex.quote(str(auth['user_domain_name']))}",
+        f"export OS_PROJECT_DOMAIN_NAME={shlex.quote(str(auth['project_domain_name']))}",
+        "export OS_INTERFACE=public",
+    ]
+    if admin_cloud.get("region_name"):
+        lines.append(f"export OS_REGION_NAME={shlex.quote(str(admin_cloud['region_name']))}")
+    if admin_cloud.get("cacert"):
+        lines.append(f"export OS_CACERT={shlex.quote(str(admin_cloud['cacert']))}")
+    elif urlparse(auth_url).scheme.lower() == "https":
+        lines.append("# HTTPS is enabled; system CA trust will be used.")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Generate Sunbeam benchmark args and adminrc.")
+    parser.add_argument("--clouds-yaml", required=True)
+    parser.add_argument("--scenario", default=DEFAULT_SCENARIO)
+    parser.add_argument("--output-args", required=True)
+    parser.add_argument("--output-adminrc", required=True)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    clouds_yaml = Path(args.clouds_yaml).resolve()
+    output_args = Path(args.output_args).resolve()
+    output_adminrc = Path(args.output_adminrc).resolve()
+    config = _normalize_clouds(clouds_yaml)
+    if args.scenario != DEFAULT_SCENARIO:
+        raise RuntimeError(f"Unsupported scenario selector: {args.scenario}")
+    with tempfile.TemporaryDirectory(prefix="rally-ci-clouds-") as temp_dir:
+        normalized_clouds_yaml = Path(temp_dir) / "clouds.yaml"
+        normalized_clouds_yaml.write_text(
+            yaml.safe_dump(config, sort_keys=False),
+            encoding="utf-8",
+        )
+        rendered_args = _build_autonomous_vm_args(normalized_clouds_yaml, config)
+        output_args.parent.mkdir(parents=True, exist_ok=True)
+        output_adminrc.parent.mkdir(parents=True, exist_ok=True)
+        output_args.write_text(yaml.safe_dump(rendered_args, sort_keys=False), encoding="utf-8")
+        output_args.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        _write_adminrc(output_adminrc, config["clouds"]["sunbeam-admin"])
+    print("Environment ready.\n")
+    print(f"Generated:\n  {output_args}\n  {output_adminrc}\n")
+    print(
+        "Next steps:\n"
+        "  source .venv/bin/activate\n"
+        f"  source {output_adminrc}\n"
+        "  rally task validate tasks/autonomous_vm_waves.yaml.j2 "
+        f"--task-args-file {output_args}\n"
+        "  rally task start tasks/autonomous_vm_waves.yaml.j2 "
+        f"--task-args-file {output_args}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

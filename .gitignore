@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.python-version
+
+# Build and packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+.uv/
+
+# Test and type-check caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Editors and OS noise
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local benchmark outputs
+*.log
+*.tmp
+*.bak
+
+# Local task args and scratch files
+adminrc
+args/local*.yaml
+args/*.local.yaml
+args/*.secret.yaml

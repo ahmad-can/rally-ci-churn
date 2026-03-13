@@ -1,0 +1,81 @@
+# Benchmark Tuning
+
+## What to tune first
+
+### Autonomous VM scenarios
+
+Key knobs:
+
+- `waves`
+- `concurrency`
+- `timeout_seconds`
+- `timeout_mode`
+- workload profile and workload params
+
+Guidance:
+
+- raise `concurrency` before adding many waves if you want to see live pressure
+- use more waves when you want repeated control-plane churn with stable shape
+- keep `timeout_seconds` finite unless you explicitly want hangs to persist
+
+### Spiky scenario
+
+Key knobs:
+
+- `duration_seconds`
+- `max_active_vms`
+- `baseline_launches_per_minute`
+- `burst_windows`
+
+Guidance:
+
+- increase `max_active_vms` only after validating network and quota headroom
+- use burst windows to model CI rushes instead of just raising the baseline
+- compare `effective_launches_per_minute` against configured rate to see drop behavior
+
+### Quota-edge scenario
+
+Key knobs:
+
+- `launches_per_tick`
+- `launch_tick_seconds`
+- `max_consecutive_launch_failures`
+
+Guidance:
+
+- use small launch batches first to learn the failure mode
+- increase aggressiveness only after confirming cleanup is reliable
+
+### Distributed fio scenario
+
+Key knobs:
+
+- `client_counts`
+- `volumes_per_client`
+- `volume_size_gib`
+- `profile_names`
+- `numjobs`
+- `iodepths`
+- `runtime_seconds`
+
+Guidance:
+
+- scale `client_counts` first to increase distributed pressure
+- scale `volumes_per_client` when you want more block-device fan-out per worker
+- keep `volume_size_gib` large enough for the fio access pattern
+- raise `numjobs` and `iodepths` only after confirming the baseline topology works
+
+## Flavor and image tuning
+
+Flavor and image guidance is intentionally split out:
+
+- image strategy:
+  [images.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/images.md)
+- per-image build/upload/flavor notes:
+  [images/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/images/README.md)
+
+## Result interpretation
+
+- use Rally `Phase timings` to understand orchestration overhead
+- use scenario `Summary` and `Key metrics` to compare runs
+- use local artifact bundles when you need raw fio or guest-level details

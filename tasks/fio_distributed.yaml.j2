@@ -55,6 +55,9 @@ subtasks:
 {% endif %}
         client_counts: {{ fio_cfg.client_counts or [1, 2] }}
         volumes_per_client: {{ fio_cfg.volumes_per_client or [1] }}
+{% if fio_cfg.profile_names %}
+        profile_names: {{ fio_cfg.profile_names }}
+{% endif %}
         rw_modes: {{ fio_cfg.rw_modes or ['write', 'read'] }}
         block_sizes: {{ fio_cfg.block_sizes or ['1M'] }}
         numjobs: {{ fio_cfg.numjobs or [1, 2] }}

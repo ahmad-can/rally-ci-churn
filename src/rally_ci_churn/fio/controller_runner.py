@@ -7,6 +7,28 @@ import json
 import subprocess
 from pathlib import Path
 
+BUILTIN_PROFILES = {
+    "mixed-workload": {
+        "rw_mode": "randrw",
+        "block_size": "64k",
+        "job_name": "mixed-workload",
+        "global_options": {
+            "rwmixread": "50",
+            "log_avg_msec": "1000",
+        },
+    },
+    "db-workload": {
+        "rw_mode": "randrw",
+        "block_size": "4k",
+        "job_name": "db-workload",
+        "global_options": {
+            "rwmixread": "70",
+            "random_distribution": "zipf:0.99",
+            "log_avg_msec": "1000",
+        },
+    },
+}
+
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a fio matrix from the controller VM.")
@@ -18,16 +40,22 @@ def _parse_args() -> argparse.Namespace:
 
 def _write_jobfile(
     path: Path,
-    rw_mode: str,
-    block_size: str,
-    numjobs: int,
-    iodepth: int,
+    case: dict[str, object],
     runtime_seconds: int,
     ramp_time_seconds: int,
     ioengine: str,
     volumes_per_client: int,
     prefill: bool,
 ) -> None:
+    rw_mode = str(case["rw_mode"])
+    block_size = str(case["block_size"])
+    numjobs = int(case["numjobs"])
+    iodepth = int(case["iodepth"])
+    profile_name = str(case.get("profile_name") or "custom")
+    profile_options = case.get("profile_options", {})
+    if not isinstance(profile_options, dict):
+        profile_options = {}
+    log_prefix = f"{profile_name}-iodepth-{iodepth}-numjobs-{numjobs}"
     global_lines = [
         "[global]",
         f"ioengine={ioengine}",
@@ -45,13 +73,19 @@ def _write_jobfile(
         "randrepeat=0",
         "size=100%",
         "invalidate=1",
+        f"write_bw_log={log_prefix}",
+        f"write_iops_log={log_prefix}",
+        f"write_lat_log={log_prefix}",
         "",
     ]
+    for key, value in profile_options.items():
+        global_lines.insert(-1, f"{key}={value}")
     job_lines = [line for line in global_lines if line]
+    job_name = str(case.get("job_name") or "workload")
     for index in range(volumes_per_client):
         job_lines.extend(
             [
-                f"[vol{index + 1:02d}]",
+                f"[{job_name}-vol{index + 1:02d}]",
                 f"filename=/var/lib/rally-fio/devices/vol{index + 1:02d}",
                 "",
             ]
@@ -63,7 +97,10 @@ def _read_direction_stats(payload: dict[str, object], rw_mode: str) -> dict[str,
     jobs = payload.get("jobs", [])
     client_stats = payload.get("client_stats", [])
     entries = jobs if isinstance(jobs, list) and jobs else client_stats if isinstance(client_stats, list) else []
-    direction = "read" if "read" in rw_mode else "write"
+    if rw_mode in {"rw", "randrw", "readwrite", "randreadwrite"}:
+        directions = ["read", "write"]
+    else:
+        directions = ["read" if "read" in rw_mode else "write"]
     bandwidth = 0.0
     iops = 0.0
     latencies_ms: list[float] = []
@@ -73,20 +110,21 @@ def _read_direction_stats(payload: dict[str, object], rw_mode: str) -> dict[str,
             continue
         if job.get("jobname") == "All clients":
             continue
-        stats = job.get(direction, {})
-        if not isinstance(stats, dict):
-            continue
-        bandwidth += float(stats.get("bw_bytes", 0.0))
-        iops += float(stats.get("iops", 0.0))
-        clat_ns = stats.get("clat_ns", {})
-        if isinstance(clat_ns, dict):
-            if "mean" in clat_ns:
-                latencies_ms.append(float(clat_ns.get("mean", 0.0)) / 1_000_000.0)
-            percentiles = clat_ns.get("percentile", {})
-            if isinstance(percentiles, dict):
-                p99_raw = percentiles.get("99.000000") or percentiles.get("99.00")
-                if p99_raw:
-                    p99_ms = max(p99_ms, float(p99_raw) / 1_000_000.0)
+        for direction in directions:
+            stats = job.get(direction, {})
+            if not isinstance(stats, dict):
+                continue
+            bandwidth += float(stats.get("bw_bytes", 0.0))
+            iops += float(stats.get("iops", 0.0))
+            clat_ns = stats.get("clat_ns", {})
+            if isinstance(clat_ns, dict):
+                if "mean" in clat_ns:
+                    latencies_ms.append(float(clat_ns.get("mean", 0.0)) / 1_000_000.0)
+                percentiles = clat_ns.get("percentile", {})
+                if isinstance(percentiles, dict):
+                    p99_raw = percentiles.get("99.000000") or percentiles.get("99.00")
+                    if p99_raw:
+                        p99_ms = max(p99_ms, float(p99_raw) / 1_000_000.0)
     average_latency = sum(latencies_ms) / len(latencies_ms) if latencies_ms else 0.0
     return {
         "throughput_bytes_per_sec": bandwidth,
@@ -150,12 +188,12 @@ def _write_summary_markdown(output_dir: Path, rows: list[dict[str, object]]) -> 
     lines = [
         "## Summary Table",
         "",
-        "| Client Nodes | Volumes/Client | Total Volumes | RW | Block Size | NumJobs | IoDepth | Throughput (BW) | IOPS | Avg Latency (ms) | 99th Percentile Latency (ms) |",
-        "|--------------|----------------|---------------|----|------------|---------|---------|-----------------|------|------------------|-----------------------------|",
+        "| Client Nodes | Volumes/Client | Total Volumes | Profile | RW | Block Size | NumJobs | IoDepth | Throughput (BW) | IOPS | Avg Latency (ms) | 99th Percentile Latency (ms) |",
+        "|--------------|----------------|---------------|---------|----|------------|---------|---------|-----------------|------|------------------|-----------------------------|",
     ]
     for row in rows:
         lines.append(
-            "| {client_nodes} | {volumes_per_client} | {total_volumes} | {rw_mode} | {block_size} | {numjobs} | {iodepth} | {throughput_human} | {iops_human} | {avg_latency_ms:.2f} | {p99_latency_ms:.2f} |".format(
+            "| {client_nodes} | {volumes_per_client} | {total_volumes} | {profile_name} | {rw_mode} | {block_size} | {numjobs} | {iodepth} | {throughput_human} | {iops_human} | {avg_latency_ms:.2f} | {p99_latency_ms:.2f} |".format(
                 **row
             )
         )
@@ -169,6 +207,7 @@ def _write_summary_markdown(output_dir: Path, rows: list[dict[str, object]]) -> 
                 "",
                 f"- Clients: {row['client_nodes']}",
                 f"- Volumes/client: {row['volumes_per_client']}",
+                f"- Profile: {row['profile_name']}",
                 f"- RW: {row['rw_mode']}",
                 f"- Block size: {row['block_size']}",
                 f"- NumJobs: {row['numjobs']}",
@@ -213,10 +252,15 @@ def main() -> int:
             prefill_job = output_dir / f"prefill-{client_nodes}-{volumes_per_client}.fio"
             _write_jobfile(
                 prefill_job,
-                "write",
-                "1M",
-                1,
-                1,
+                {
+                    "rw_mode": "write",
+                    "block_size": "1M",
+                    "numjobs": 1,
+                    "iodepth": 1,
+                    "profile_name": "prefill",
+                    "profile_options": {},
+                    "job_name": "prefill-job",
+                },
                 0,
                 0,
                 str(matrix["ioengine"]),
@@ -234,10 +278,7 @@ def main() -> int:
 
         _write_jobfile(
             case_job,
-            str(case["rw_mode"]),
-            str(case["block_size"]),
-            int(case["numjobs"]),
-            int(case["iodepth"]),
+            case,
             int(matrix["runtime_seconds"]),
             int(matrix["ramp_time_seconds"]),
             str(matrix["ioengine"]),
@@ -264,6 +305,7 @@ def main() -> int:
                 "client_nodes": client_nodes,
                 "volumes_per_client": volumes_per_client,
                 "total_volumes": client_nodes * volumes_per_client,
+                "profile_name": case.get("profile_name") or "custom",
                 "rw_mode": case["rw_mode"],
                 "block_size": case["block_size"],
                 "numjobs": int(case["numjobs"]),
@@ -287,7 +329,7 @@ def main() -> int:
     (output_dir / "summary.csv").write_text(
         "\n".join(
             [
-                "case_id,client_nodes,volumes_per_client,total_volumes,rw_mode,block_size,numjobs,iodepth,throughput_bytes_per_sec,iops,avg_latency_ms,p99_latency_ms"
+                "case_id,client_nodes,volumes_per_client,total_volumes,profile_name,rw_mode,block_size,numjobs,iodepth,throughput_bytes_per_sec,iops,avg_latency_ms,p99_latency_ms"
             ]
             + [
                 ",".join(
@@ -296,6 +338,7 @@ def main() -> int:
                         str(row["client_nodes"]),
                         str(row["volumes_per_client"]),
                         str(row["total_volumes"]),
+                        str(row["profile_name"]),
                         str(row["rw_mode"]),
                         str(row["block_size"]),
                         str(row["numjobs"]),

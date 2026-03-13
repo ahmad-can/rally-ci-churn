@@ -277,10 +277,9 @@ def _build_fio_distributed_preset(
     rendered["fio"] = {
         "client_counts": [1, 2],
         "volumes_per_client": [1],
-        "rw_modes": ["write", "read"],
-        "block_sizes": ["1M"],
+        "profile_names": ["mixed-workload", "db-workload"],
         "numjobs": [1, 2],
-        "iodepths": [1, 32],
+        "iodepths": [1],
         "runtime_seconds": 30,
         "ramp_time_seconds": 5,
         "fio_port": 8765,

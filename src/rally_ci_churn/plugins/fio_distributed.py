@@ -42,9 +42,34 @@ def _as_str_list(values: list[object]) -> list[str]:
     return [str(value) for value in values]
 
 
+BUILTIN_FIO_PROFILES = {
+    "mixed-workload": {
+        "rw_mode": "randrw",
+        "block_size": "64k",
+        "job_name": "mixed-workload",
+        "profile_options": {
+            "rwmixread": "50",
+            "log_avg_msec": "1000",
+        },
+    },
+    "db-workload": {
+        "rw_mode": "randrw",
+        "block_size": "4k",
+        "job_name": "db-workload",
+        "profile_options": {
+            "rwmixread": "70",
+            "random_distribution": "zipf:0.99",
+            "log_avg_msec": "1000",
+        },
+    },
+}
+
+
 def _case_id(case: dict[str, object]) -> str:
+    profile_name = case.get("profile_name")
+    prefix = f"profile-{profile_name}_" if profile_name else ""
     return (
-        f"clients-{case['client_count']}_"
+        f"{prefix}clients-{case['client_count']}_"
         f"vols-{case['volumes_per_client']}_"
         f"rw-{case['rw_mode']}_"
         f"bs-{str(case['block_size']).replace('/', '-')}_"
@@ -345,28 +370,54 @@ runcmd:
         self,
         client_counts: list[int],
         volumes_per_client: list[int],
+        profile_names: list[str],
         rw_modes: list[str],
         block_sizes: list[str],
         numjobs: list[int],
         iodepths: list[int],
     ) -> list[dict[str, object]]:
         cases: list[dict[str, object]] = []
+        profile_defs: list[dict[str, object]] = []
+        for profile_name in profile_names:
+            profile = BUILTIN_FIO_PROFILES.get(profile_name)
+            if profile is None:
+                raise rally_exceptions.InvalidArgumentsException(
+                    argument_name="profile_names",
+                    value=profile_name,
+                    valid_values=sorted(BUILTIN_FIO_PROFILES),
+                )
+            profile_defs.append({"profile_name": profile_name, **profile})
+        if not profile_defs:
+            profile_defs = [
+                {
+                    "profile_name": None,
+                    "rw_mode": rw_mode,
+                    "block_size": block_size,
+                    "job_name": "workload",
+                    "profile_options": {},
+                }
+                for rw_mode in rw_modes
+                for block_size in block_sizes
+            ]
+
         for client_count in client_counts:
             for volumes in volumes_per_client:
-                for rw_mode in rw_modes:
-                    for block_size in block_sizes:
-                        for jobs in numjobs:
-                            for depth in iodepths:
-                                case = {
-                                    "client_count": client_count,
-                                    "volumes_per_client": volumes,
-                                    "rw_mode": rw_mode,
-                                    "block_size": block_size,
-                                    "numjobs": jobs,
-                                    "iodepth": depth,
-                                }
-                                case["case_id"] = _case_id(case)
-                                cases.append(case)
+                for profile in profile_defs:
+                    for jobs in numjobs:
+                        for depth in iodepths:
+                            case = {
+                                "client_count": client_count,
+                                "volumes_per_client": volumes,
+                                "profile_name": profile["profile_name"],
+                                "rw_mode": profile["rw_mode"],
+                                "block_size": profile["block_size"],
+                                "job_name": profile["job_name"],
+                                "profile_options": profile["profile_options"],
+                                "numjobs": jobs,
+                                "iodepth": depth,
+                            }
+                            case["case_id"] = _case_id(case)
+                            cases.append(case)
         return cases
 
     def _artifacts_dir(self, root_dir: str) -> Path:
@@ -407,6 +458,7 @@ runcmd:
                     row.get("client_nodes", ""),
                     row.get("volumes_per_client", ""),
                     row.get("total_volumes", ""),
+                    row.get("profile_name", ""),
                     row.get("rw_mode", ""),
                     row.get("block_size", ""),
                     row.get("numjobs", ""),
@@ -466,6 +518,7 @@ class FioDistributedScenario(_FioDistributedBase):
         volume_type=None,
         client_counts=None,
         volumes_per_client=None,
+        profile_names=None,
         rw_modes=None,
         block_sizes=None,
         numjobs=None,
@@ -478,6 +531,7 @@ class FioDistributedScenario(_FioDistributedBase):
     ):
         client_counts = _as_int_list(client_counts or [1, 2])
         volumes_per_client = _as_int_list(volumes_per_client or [1])
+        profile_names = _as_str_list(profile_names or [])
         rw_modes = _as_str_list(rw_modes or ["write", "read"])
         block_sizes = _as_str_list(block_sizes or ["1M"])
         numjobs = _as_int_list(numjobs or [1, 2])
@@ -554,6 +608,7 @@ class FioDistributedScenario(_FioDistributedBase):
                 "cases": self._matrix_cases(
                     client_counts,
                     volumes_per_client,
+                    profile_names,
                     rw_modes,
                     block_sizes,
                     numjobs,
@@ -644,6 +699,7 @@ class FioDistributedScenario(_FioDistributedBase):
                     "client_nodes",
                     "volumes_per_client",
                     "total_volumes",
+                    "profile_name",
                     "rw",
                     "block_size",
                     "numjobs",

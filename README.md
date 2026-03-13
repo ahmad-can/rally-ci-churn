@@ -291,10 +291,9 @@ The generated `fio-distributed` preset is intentionally small and smoke-oriented
 
 - `client_counts: [1, 2]`
 - `volumes_per_client: [1]`
-- `rw_modes: ["write", "read"]`
-- `block_sizes: ["1M"]`
+- `profile_names: ["mixed-workload", "db-workload"]`
 - `numjobs: [1, 2]`
-- `iodepths: [1, 32]`
+- `iodepths: [1]`
 
 Run it with:
 
@@ -321,6 +320,23 @@ Expected files include:
 - `inventory.json`
 - `raw/*.json`
 - `raw/*.stdout`
+
+Built-in fio profiles:
+
+- `mixed-workload`
+  - `rw=randrw`
+  - `bs=64k`
+  - `rwmixread=50`
+  - `log_avg_msec=1000`
+- `db-workload`
+  - `rw=randrw`
+  - `bs=4k`
+  - `rwmixread=70`
+  - `direct=1`
+  - `random_distribution=zipf:0.99`
+  - `log_avg_msec=1000`
+
+These profiles are translated to attached block-device fio jobfiles. They do not use raw librbd options like `ioengine=rbd`, `pool`, or `rbdname`.
 
 ### Building the `ubuntu-fio` image
 

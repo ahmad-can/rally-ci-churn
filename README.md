@@ -122,6 +122,18 @@ rally task start tasks/autonomous_vm_waves.yaml.j2 \
   --task-args-file args/stress-ng.yaml
 ```
 
+Recommended `stress-ng` flavor on Sunbeam:
+
+```bash
+openstack flavor create m1.stress-ng \
+  --vcpus 2 \
+  --ram 2048 \
+  --disk 5
+```
+
+That flavor is sufficient for the current `stress_ng` workload profile and
+avoids wasting local disk compared with larger default flavors.
+
 ## Bootstrap behavior
 
 `scripts/setup_uv.sh` is intentionally thin. It:
@@ -217,5 +229,33 @@ The recipe follows a minimal bootable classic-image layout:
 The resulting `disk.img` is local-only for now; Glance upload and cloud boot
 validation remain separate manual steps.
 
-The `stress-ng` preset expects the uploaded Glance image to be named
-`ubuntu-stress-ng`.
+To upload the built image to Glance for the `stress-ng` preset:
+
+```bash
+openstack image create ubuntu-stress-ng \
+  --file images/ubuntu-stress-ng/disk.img \
+  --disk-format raw \
+  --container-format bare \
+  --public
+```
+
+Set the required image properties after upload:
+
+```bash
+openstack image set ubuntu-stress-ng \
+  --property hw_firmware_type=uefi
+```
+
+The `hw_firmware_type=uefi` property is required for the current
+Imagecraft-built image layout on this cloud.
+
+Useful verification:
+
+```bash
+openstack image show ubuntu-stress-ng -f yaml
+```
+
+The `stress-ng` preset expects:
+
+- Glance image name: `ubuntu-stress-ng`
+- flavor name: `m1.stress-ng`

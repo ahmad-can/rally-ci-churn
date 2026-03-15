@@ -11,6 +11,7 @@
 {% set traffic_cfg = traffic or {} %}
 {% set ring_cfg = ring or {} %}
 {% set artifacts_cfg = artifacts or {} %}
+{% set boot_volume_cfg = boot_volume or {} %}
 ---
 version: 2
 title: "{{ title }}"
@@ -78,6 +79,13 @@ subtasks:
         ssh_user: "{{ controller_cfg.ssh_user or 'ubuntu' }}"
         ssh_connect_timeout_seconds: {{ controller_cfg.ssh_connect_timeout_seconds or 300 }}
         command_timeout_seconds: {{ controller_cfg.command_timeout_seconds or 0 }}
+        boot_from_volume: {{ boot_volume_cfg.enabled or false }}
+        root_volume_size_gib: {{ boot_volume_cfg.size_gib or 20 }}
+{% if boot_volume_cfg.volume_type is defined and boot_volume_cfg.volume_type is not none %}
+        root_volume_type: "{{ boot_volume_cfg.volume_type }}"
+{% else %}
+        root_volume_type: null
+{% endif %}
         participant_count: {{ ring_cfg.participant_count or 8 }}
         protocols: {{ traffic_cfg.protocols or ['tcp', 'udp'] }}
         duration_seconds: {{ traffic_cfg.duration_seconds or 20 }}

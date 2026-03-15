@@ -21,6 +21,7 @@ from rally_openstack.common import consts
 from rally_openstack.task import scenario
 from rally_openstack.task.scenarios.vm import utils as vm_utils
 
+from rally_ci_churn.plugins.controller_runtime import build_root_volume_boot
 from rally_ci_churn.results import build_artifacts_output
 from rally_ci_churn.results import build_metrics_output
 from rally_ci_churn.results import build_phase_output
@@ -170,15 +171,25 @@ runcmd:
         external_network_name: str,
         key_name: str,
         security_group_name: str,
+        boot_from_volume: bool = False,
+        root_volume_size_gib: int = 20,
+        root_volume_type: str | None = None,
     ):
-        return self._boot_server_with_fip(
+        boot_image, boot_kwargs = build_root_volume_boot(
             image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        return self._boot_server_with_fip(
+            boot_image,
             flavor,
             use_floating_ip=True,
             floating_network=external_network_name,
             key_name=key_name,
             security_groups=[security_group_name],
             userdata=self._controller_user_data(),
+            **boot_kwargs,
         )
 
     @atomic.action_timer("benchmark.boot")
@@ -188,14 +199,24 @@ runcmd:
         flavor,
         key_name: str,
         security_group_name: str,
+        boot_from_volume: bool = False,
+        root_volume_size_gib: int = 20,
+        root_volume_type: str | None = None,
     ):
-        return self._boot_server(
+        boot_image, boot_kwargs = build_root_volume_boot(
             image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        return self._boot_server(
+            boot_image,
             flavor,
             auto_assign_nic=True,
             key_name=key_name,
             security_groups=[security_group_name],
             userdata=self._benchmark_user_data(),
+            **boot_kwargs,
         )
 
     def _wait_for_volume_status(self, volume_id: str, statuses: list[str], timeout_seconds: int = 600):
@@ -400,6 +421,9 @@ class NetManyToOneScenario(_NetTrafficBase):
         ssh_user="ubuntu",
         ssh_connect_timeout_seconds=300,
         command_timeout_seconds=0,
+        boot_from_volume=False,
+        root_volume_size_gib=20,
+        root_volume_type=None,
         client_count=8,
         mode="iperf3",
         protocols=None,
@@ -424,6 +448,7 @@ class NetManyToOneScenario(_NetTrafficBase):
         duration_seconds = int(duration_seconds)
         ramp_time_seconds = int(ramp_time_seconds)
         base_port = int(base_port)
+        root_volume_size_gib = int(root_volume_size_gib)
         tenant_cidr = self._tenant_cidr()
 
         keypair = self._create_keypair()
@@ -446,10 +471,29 @@ class NetManyToOneScenario(_NetTrafficBase):
                 external_network_name,
                 keypair["name"],
                 controller_sg["name"],
+                boot_from_volume=bool(boot_from_volume),
+                root_volume_size_gib=root_volume_size_gib,
+                root_volume_type=root_volume_type,
             )
-            server = self._boot_benchmark_vm(server_image, server_flavor, keypair["name"], benchmark_sg["name"])
+            server = self._boot_benchmark_vm(
+                server_image,
+                server_flavor,
+                keypair["name"],
+                benchmark_sg["name"],
+                boot_from_volume=bool(boot_from_volume),
+                root_volume_size_gib=root_volume_size_gib,
+                root_volume_type=root_volume_type,
+            )
             for _ in range(client_count):
-                client = self._boot_benchmark_vm(client_image, client_flavor, keypair["name"], benchmark_sg["name"])
+                client = self._boot_benchmark_vm(
+                    client_image,
+                    client_flavor,
+                    keypair["name"],
+                    benchmark_sg["name"],
+                    boot_from_volume=bool(boot_from_volume),
+                    root_volume_size_gib=root_volume_size_gib,
+                    root_volume_type=root_volume_type,
+                )
                 clients.append({"name": client.name, "fixed_ip": self._fixed_ip(client), "server": client})
 
             if mode == "http_volume":
@@ -677,6 +721,9 @@ class NetRingScenario(_NetTrafficBase):
         ssh_user="ubuntu",
         ssh_connect_timeout_seconds=300,
         command_timeout_seconds=0,
+        boot_from_volume=False,
+        root_volume_size_gib=20,
+        root_volume_type=None,
         participant_count=8,
         protocols=None,
         duration_seconds=20,
@@ -698,6 +745,7 @@ class NetRingScenario(_NetTrafficBase):
         ramp_time_seconds = int(ramp_time_seconds)
         base_port = int(base_port)
         neighbors_per_vm = int(neighbors_per_vm)
+        root_volume_size_gib = int(root_volume_size_gib)
         tenant_cidr = self._tenant_cidr()
 
         keypair = self._create_keypair()
@@ -718,6 +766,9 @@ class NetRingScenario(_NetTrafficBase):
                 external_network_name,
                 keypair["name"],
                 controller_sg["name"],
+                boot_from_volume=bool(boot_from_volume),
+                root_volume_size_gib=root_volume_size_gib,
+                root_volume_type=root_volume_type,
             )
             for _ in range(participant_count):
                 participant = self._boot_benchmark_vm(
@@ -725,6 +776,9 @@ class NetRingScenario(_NetTrafficBase):
                     participant_flavor,
                     keypair["name"],
                     benchmark_sg["name"],
+                    boot_from_volume=bool(boot_from_volume),
+                    root_volume_size_gib=root_volume_size_gib,
+                    root_volume_type=root_volume_type,
                 )
                 participants.append({"name": participant.name, "fixed_ip": self._fixed_ip(participant), "server": participant})
 

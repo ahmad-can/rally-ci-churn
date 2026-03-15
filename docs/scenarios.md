@@ -2,6 +2,9 @@
 
 ## Scenario catalog
 
+All VM-creating scenarios support a top-level `boot_volume` toggle to boot
+instances from Cinder-backed root disks instead of ephemeral local disks.
+
 ### `CIChurn.boot_autonomous_vm`
 
 - topology:

@@ -12,6 +12,10 @@ cloud:
 network:
   start_cidr: "10.78.0.0/22"
   dns_nameservers: []
+boot_volume:
+  enabled: false
+  size_gib: 20
+  volume_type: null
 controller:
   ssh_user: "ubuntu"
   ssh_connect_timeout_seconds: 300

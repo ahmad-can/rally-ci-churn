@@ -19,6 +19,7 @@ from rally_openstack.task import scenario
 
 from rally_ci_churn.plugins.controller_runtime import ControllerRuntimeBase
 from rally_ci_churn.plugins.controller_runtime import SSH_PORT
+from rally_ci_churn.plugins.controller_runtime import build_root_volume_boot
 from rally_ci_churn.results import build_artifacts_output
 from rally_ci_churn.results import build_metrics_output
 from rally_ci_churn.results import build_phase_output
@@ -175,15 +176,25 @@ runcmd:
         external_network_name: str,
         key_name: str,
         security_group_name: str,
+        boot_from_volume: bool = False,
+        root_volume_size_gib: int = 20,
+        root_volume_type: str | None = None,
     ):
-        return self._boot_server_with_fip(
+        boot_image, boot_kwargs = build_root_volume_boot(
             controller_image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        return self._boot_server_with_fip(
+            boot_image,
             controller_flavor,
             use_floating_ip=True,
             floating_network=external_network_name,
             key_name=key_name,
             security_groups=[security_group_name],
             userdata=self._build_controller_user_data(),
+            **boot_kwargs,
         )
 
     @atomic.action_timer("worker.boot")
@@ -195,14 +206,24 @@ runcmd:
         security_group_name: str,
         expected_volumes: int,
         fio_port: int,
+        boot_from_volume: bool = False,
+        root_volume_size_gib: int = 20,
+        root_volume_type: str | None = None,
     ):
-        return self._boot_server(
+        boot_image, boot_kwargs = build_root_volume_boot(
             worker_image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        return self._boot_server(
+            boot_image,
             worker_flavor,
             auto_assign_nic=True,
             key_name=key_name,
             security_groups=[security_group_name],
             userdata=self._build_worker_user_data(expected_volumes, fio_port),
+            **boot_kwargs,
         )
 
     @atomic.action_timer("worker.wait_ready")
@@ -518,6 +539,9 @@ class FioDistributedScenario(_FioDistributedBase):
         ssh_user="ubuntu",
         ssh_connect_timeout_seconds=300,
         command_timeout_seconds=0,
+        boot_from_volume=False,
+        root_volume_size_gib=20,
+        root_volume_type=None,
         volume_size_gib=10,
         volume_type=None,
         client_counts=None,
@@ -546,6 +570,7 @@ class FioDistributedScenario(_FioDistributedBase):
         fio_port = int(fio_port)
         ssh_connect_timeout_seconds = int(ssh_connect_timeout_seconds)
         command_timeout_seconds = int(command_timeout_seconds)
+        root_volume_size_gib = int(root_volume_size_gib)
         max_clients = max(client_counts)
         max_volumes_per_client = max(volumes_per_client)
         tenant_cidr = self._tenant_cidr()
@@ -570,6 +595,9 @@ class FioDistributedScenario(_FioDistributedBase):
                 external_network_name,
                 keypair["name"],
                 controller_sg["name"],
+                boot_from_volume=bool(boot_from_volume),
+                root_volume_size_gib=root_volume_size_gib,
+                root_volume_type=root_volume_type,
             )
             for _ in range(max_clients):
                 worker = self._boot_worker(
@@ -579,6 +607,9 @@ class FioDistributedScenario(_FioDistributedBase):
                     worker_sg["name"],
                     max_volumes_per_client,
                     fio_port,
+                    boot_from_volume=bool(boot_from_volume),
+                    root_volume_size_gib=root_volume_size_gib,
+                    root_volume_type=root_volume_type,
                 )
                 workers.append({"server": worker, "fixed_ip": self._fixed_ip(worker)})
 

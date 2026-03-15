@@ -20,6 +20,11 @@ cloud:
 network:
   dns_nameservers: []
 
+boot_volume:
+  enabled: false
+  size_gib: 20
+  volume_type: null
+
 storage:
   artifact_container: "rally-ci-churn"
   artifact_ttl_seconds: 86400

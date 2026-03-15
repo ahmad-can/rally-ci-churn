@@ -22,6 +22,7 @@ from rally_openstack.common import consts
 from rally_openstack.task import scenario
 from rally_openstack.task.scenarios.nova import utils as nova_utils
 
+from rally_ci_churn.plugins.controller_runtime import build_root_volume_boot
 from rally_ci_churn.results import build_artifacts_output
 from rally_ci_churn.results import build_failure_reason_output
 from rally_ci_churn.results import build_metrics_output
@@ -295,6 +296,9 @@ class _AutonomousVMBase(nova_utils.NovaScenario):
         wave: int,
         **kwargs,
     ) -> dict[str, object]:
+        boot_from_volume = bool(kwargs.pop("boot_from_volume", False))
+        root_volume_size_gib = int(kwargs.pop("root_volume_size_gib", 20) or 20)
+        root_volume_type = kwargs.pop("root_volume_type", None)
         result_object_name = f"results/{uuid.uuid4().hex}.json"
         payload = {
             "scenario_name": scenario_name,
@@ -316,7 +320,14 @@ class _AutonomousVMBase(nova_utils.NovaScenario):
             "result_object_name": result_object_name,
         }
         kwargs["userdata"] = self._build_user_data(payload, swift_cacert_b64)
-        server = self._boot_server(image, flavor, auto_assign_nic=True, **kwargs)
+        boot_image, boot_kwargs = build_root_volume_boot(
+            image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        kwargs.update(boot_kwargs)
+        server = self._boot_server(boot_image, flavor, auto_assign_nic=True, **kwargs)
         return {
             "server": server,
             "result_object_name": result_object_name,

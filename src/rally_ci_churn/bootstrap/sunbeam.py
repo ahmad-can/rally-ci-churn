@@ -158,6 +158,11 @@ def _build_base_args(clouds_yaml: Path, config: dict[str, object]) -> dict[str, 
         "network": {
             "dns_nameservers": _select_sunbeam_dns(clouds_yaml),
         },
+        "boot_volume": {
+            "enabled": False,
+            "size_gib": 20,
+            "volume_type": None,
+        },
         "users": {
             "tenants": 1,
             "users_per_tenant": 1,

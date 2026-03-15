@@ -131,6 +131,22 @@ Guidance:
 - increase TCP `parallel_streams` before increasing VM counts if you are flow-limited
 - use UDP targets carefully; packet loss is often the first useful signal
 
+## Root boot volume toggle
+
+Every VM-creating scenario supports:
+
+```yaml
+boot_volume:
+  enabled: true
+  size_gib: 20
+  volume_type: null
+```
+
+This switches the root disk from ephemeral storage to a Cinder-backed boot
+volume. It applies to all VM roles in the selected scenario. It does not replace
+extra data volumes already used by `fio-distributed`, `mixed-pressure`, or the
+HTTP server variant of `net-many-to-one`.
+
 ## Flavor and image tuning
 
 Flavor and image guidance is intentionally split out:

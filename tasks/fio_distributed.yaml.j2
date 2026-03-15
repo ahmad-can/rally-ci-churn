@@ -11,6 +11,7 @@
 {% set cinder_cfg = cinder or {} %}
 {% set fio_cfg = fio or {} %}
 {% set artifacts_cfg = artifacts or {} %}
+{% set boot_volume_cfg = boot_volume or {} %}
 ---
 version: 2
 title: "{{ title }}"
@@ -77,6 +78,13 @@ subtasks:
         ssh_user: "{{ controller_cfg.ssh_user or 'ubuntu' }}"
         ssh_connect_timeout_seconds: {{ controller_cfg.ssh_connect_timeout_seconds or 300 }}
         command_timeout_seconds: {{ controller_cfg.command_timeout_seconds or 0 }}
+        boot_from_volume: {{ boot_volume_cfg.enabled or false }}
+        root_volume_size_gib: {{ boot_volume_cfg.size_gib or 20 }}
+{% if boot_volume_cfg.volume_type is defined and boot_volume_cfg.volume_type is not none %}
+        root_volume_type: "{{ boot_volume_cfg.volume_type }}"
+{% else %}
+        root_volume_type: null
+{% endif %}
         volume_size_gib: {{ cinder_cfg.volume_size_gib or 10 }}
 {% if cinder_cfg.volume_type is defined and cinder_cfg.volume_type is not none %}
         volume_type: "{{ cinder_cfg.volume_type }}"

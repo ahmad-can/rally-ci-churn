@@ -8,6 +8,7 @@
 {% set nova_quota_cfg = quota_context_cfg.nova if quota_context_cfg.nova is defined else {} %}
 {% set cinder_quota_cfg = quota_context_cfg.cinder if quota_context_cfg.cinder is defined else {} %}
 {% set neutron_quota_cfg = quota_context_cfg.neutron if quota_context_cfg.neutron is defined else {} %}
+{% set boot_volume_cfg = boot_volume or {} %}
 {% set storage_cfg = storage or {} %}
 {% set workload_cfg = workload or {} %}
 {% set quota_edge_cfg = quota_edge or {} %}
@@ -87,6 +88,13 @@ subtasks:
         console_log_length: {{ scenario_cfg.console_log_length or 400 }}
         allow_guest_errors: {{ scenario_cfg.allow_guest_errors or false }}
         allow_guest_timeouts: {{ scenario_cfg.allow_guest_timeouts or false }}
+        boot_from_volume: {{ boot_volume_cfg.enabled or false }}
+        root_volume_size_gib: {{ boot_volume_cfg.size_gib or 20 }}
+{% if boot_volume_cfg.volume_type is defined and boot_volume_cfg.volume_type is not none %}
+        root_volume_type: "{{ boot_volume_cfg.volume_type }}"
+{% else %}
+        root_volume_type: null
+{% endif %}
         duration_seconds: {{ quota_edge_cfg.duration_seconds or 900 }}
         launches_per_tick: {{ quota_edge_cfg.launches_per_tick or 2 }}
         launch_tick_seconds: {{ quota_edge_cfg.launch_tick_seconds or 1 }}

@@ -23,6 +23,28 @@ ATTACH_RETRY_DELAY_SECONDS = 5.0
 VOLUME_POLL_INTERVAL_SECONDS = 2.0
 
 
+def build_root_volume_boot(
+    image,
+    enabled: bool = False,
+    volume_size_gib: int = 20,
+    volume_type: str | None = None,
+) -> tuple[object, dict[str, object]]:
+    if not enabled:
+        return image, {}
+    image_id = getattr(image, "id", image)
+    block_device = {
+        "uuid": str(image_id),
+        "source_type": "image",
+        "destination_type": "volume",
+        "boot_index": 0,
+        "delete_on_termination": True,
+        "volume_size": int(volume_size_gib),
+    }
+    if volume_type:
+        block_device["volume_type"] = volume_type
+    return "", {"block_device_mapping_v2": [block_device]}
+
+
 class ControllerRuntimeBase(vm_utils.VMScenario):
     """Common OpenStack orchestration helpers for controller-driven scenarios."""
 

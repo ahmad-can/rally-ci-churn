@@ -23,6 +23,7 @@ from rally_openstack.task import scenario
 from rally_ci_churn.plugins.autonomous_vm import _AutonomousVMBase
 from rally_ci_churn.plugins.controller_runtime import ControllerRuntimeBase
 from rally_ci_churn.plugins.controller_runtime import SSH_PORT
+from rally_ci_churn.plugins.controller_runtime import build_root_volume_boot
 from rally_ci_churn.results import build_artifacts_output
 from rally_ci_churn.results import build_metrics_output
 from rally_ci_churn.results import build_phase_output
@@ -128,15 +129,25 @@ runcmd:
         external_network_name: str,
         key_name: str,
         security_group_name: str,
+        boot_from_volume: bool = False,
+        root_volume_size_gib: int = 20,
+        root_volume_type: str | None = None,
     ):
-        return self._boot_server_with_fip(
+        boot_image, boot_kwargs = build_root_volume_boot(
             image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        return self._boot_server_with_fip(
+            boot_image,
             flavor,
             use_floating_ip=True,
             floating_network=external_network_name,
             key_name=key_name,
             security_groups=[security_group_name],
             userdata=self._controller_user_data(),
+            **boot_kwargs,
         )
 
     @atomic.action_timer("benchmark.boot")
@@ -146,14 +157,24 @@ runcmd:
         flavor,
         key_name: str,
         security_group_name: str,
+        boot_from_volume: bool = False,
+        root_volume_size_gib: int = 20,
+        root_volume_type: str | None = None,
     ):
-        return self._boot_server(
+        boot_image, boot_kwargs = build_root_volume_boot(
             image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        return self._boot_server(
+            boot_image,
             flavor,
             auto_assign_nic=True,
             key_name=key_name,
             security_groups=[security_group_name],
             userdata=self._net_benchmark_user_data(),
+            **boot_kwargs,
         )
 
     @atomic.action_timer("fio.worker.boot")
@@ -165,14 +186,24 @@ runcmd:
         security_group_name: str,
         expected_volumes: int,
         fio_port: int,
+        boot_from_volume: bool = False,
+        root_volume_size_gib: int = 20,
+        root_volume_type: str | None = None,
     ):
-        return self._boot_server(
+        boot_image, boot_kwargs = build_root_volume_boot(
             image,
+            enabled=boot_from_volume,
+            volume_size_gib=root_volume_size_gib,
+            volume_type=root_volume_type,
+        )
+        return self._boot_server(
+            boot_image,
             flavor,
             auto_assign_nic=True,
             key_name=key_name,
             security_groups=[security_group_name],
             userdata=self._build_fio_worker_user_data(expected_volumes, fio_port),
+            **boot_kwargs,
         )
 
     def _create_fio_worker_security_group(self, tenant_cidr: str, fio_port: int) -> dict[str, object]:
@@ -592,6 +623,9 @@ class MixedPressureScenario(_MixedPressureBase):
         ssh_user="ubuntu",
         ssh_connect_timeout_seconds=300,
         command_timeout_seconds=0,
+        boot_from_volume=False,
+        root_volume_size_gib=20,
+        root_volume_type=None,
         duration_seconds=90,
         subbenchmark_failure_mode="fail",
         artifact_container="rally-ci-churn",
@@ -674,6 +708,7 @@ class MixedPressureScenario(_MixedPressureBase):
         baseline_launches_per_minute = float(baseline_launches_per_minute)
         ssh_connect_timeout_seconds = int(ssh_connect_timeout_seconds)
         command_timeout_seconds = int(command_timeout_seconds)
+        root_volume_size_gib = int(root_volume_size_gib)
         fio_port = int(fio_port)
         tenant_cidr = self._tenant_cidr()
         if duration_seconds <= 0:
@@ -728,12 +763,18 @@ class MixedPressureScenario(_MixedPressureBase):
                 external_network_name,
                 keypair["name"],
                 controller_sg["name"],
+                boot_from_volume=bool(boot_from_volume),
+                root_volume_size_gib=root_volume_size_gib,
+                root_volume_type=root_volume_type,
             )
             many_server = self._boot_benchmark_vm(
                 net_image,
                 fixed_group_flavor,
                 keypair["name"],
                 benchmark_sg["name"],
+                boot_from_volume=bool(boot_from_volume),
+                root_volume_size_gib=root_volume_size_gib,
+                root_volume_type=root_volume_type,
             )
             for _ in range(int(many_client_count)):
                 client = self._boot_benchmark_vm(
@@ -741,6 +782,9 @@ class MixedPressureScenario(_MixedPressureBase):
                     fixed_group_flavor,
                     keypair["name"],
                     benchmark_sg["name"],
+                    boot_from_volume=bool(boot_from_volume),
+                    root_volume_size_gib=root_volume_size_gib,
+                    root_volume_type=root_volume_type,
                 )
                 many_clients.append({"server": client, "fixed_ip": self._fixed_ip(client), "name": client.name})
             for _ in range(int(ring_participant_count)):
@@ -749,6 +793,9 @@ class MixedPressureScenario(_MixedPressureBase):
                     fixed_group_flavor,
                     keypair["name"],
                     benchmark_sg["name"],
+                    boot_from_volume=bool(boot_from_volume),
+                    root_volume_size_gib=root_volume_size_gib,
+                    root_volume_type=root_volume_type,
                 )
                 ring_participants.append({"server": participant, "fixed_ip": self._fixed_ip(participant), "name": participant.name})
             max_fio_clients = max(fio_client_counts)
@@ -761,6 +808,9 @@ class MixedPressureScenario(_MixedPressureBase):
                     fio_worker_sg["name"],
                     max_fio_volumes,
                     fio_port,
+                    boot_from_volume=bool(boot_from_volume),
+                    root_volume_size_gib=root_volume_size_gib,
+                    root_volume_type=root_volume_type,
                 )
                 fio_workers.append({"server": worker, "fixed_ip": self._fixed_ip(worker), "name": worker.name})
             device_letters = "bcdefghijklmnopqrstuvwxyz"

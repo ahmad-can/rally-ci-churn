@@ -5,13 +5,13 @@ artifacts.
 
 ## Image index
 
-- [ubuntu-fio/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/images/ubuntu-fio/README.md)
+- [ubuntu-fio/README.md](./images/ubuntu-fio/README.md)
   - distributed fio controller and worker image
-- [ubuntu-netbench/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/images/ubuntu-netbench/README.md)
+- [ubuntu-netbench/README.md](./images/ubuntu-netbench/README.md)
   - network benchmark controller/server/client image
-- [ubuntu-mixed-benchmark/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/images/ubuntu-mixed-benchmark/README.md)
+- [ubuntu-mixed-benchmark/README.md](./images/ubuntu-mixed-benchmark/README.md)
   - unified image for the mixed pressure scenario
-- [ubuntu-stress-ng/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/images/ubuntu-stress-ng/README.md)
+- [ubuntu-stress-ng/README.md](./images/ubuntu-stress-ng/README.md)
   - stress-ng autonomous workload image
 
 ## Shared build path

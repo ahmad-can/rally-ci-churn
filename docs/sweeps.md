@@ -1,0 +1,133 @@
+# Capacity Sweeps
+
+## What this is
+
+The capacity sweep runner generates and optionally executes a load ladder across
+the main load-bearing scenarios:
+
+- `spiky`
+- `fio-distributed`
+- `net-many-to-one`
+- `net-ring`
+- `mixed-pressure`
+
+The default levels are:
+
+- `10%`
+- `25%`
+- `40%`
+- `60%`
+- `80%`
+
+## Default cluster model
+
+Unless overridden, the sweep uses:
+
+- `1248` vCPU
+- `6144 GiB` RAM
+- `200 Gbps` Geneve bandwidth
+- `200 Gbps` Ceph bandwidth
+
+These defaults match a `3` node cluster with:
+
+- `416` vCPU per node
+- `2 TiB` RAM per node
+- separate `200 Gbps` fabrics for Geneve and Ceph
+
+## Run it
+
+After bootstrapping the repo and Rally deployment:
+
+```bash
+./scripts/run_capacity_sweep.sh \
+  --clouds-yaml /home/ubuntu/.config/openstack/clouds.yaml
+```
+
+Useful overrides:
+
+```bash
+./scripts/run_capacity_sweep.sh \
+  --clouds-yaml /home/ubuntu/.config/openstack/clouds.yaml \
+  --levels 10,25 \
+  --scenarios spiky,fio-distributed,net-many-to-one \
+  --cluster-vcpus 1248 \
+  --cluster-ram-gib 6144 \
+  --cluster-geneve-gbps 200 \
+  --cluster-ceph-gbps 200
+```
+
+Generate-only planning:
+
+```bash
+./scripts/run_capacity_sweep.sh \
+  --clouds-yaml /home/ubuntu/.config/openstack/clouds.yaml \
+  --generate-only
+```
+
+Reference config:
+
+- [args/capacity_sweep.example.yaml](./args/capacity_sweep.example.yaml)
+
+## How sizing works
+
+When running with `--generate-only`, the sweep uses the configured
+`calibration.assumed_rates` because no live calibration task is executed.
+
+### `spiky`
+
+- sized from flavor vCPU and RAM footprint
+- uses the smaller of CPU-based and RAM-based VM capacity
+- scales `max_active_vms` first
+- keeps per-VM `stress-ng` load stable by default
+
+### `fio-distributed`
+
+- runs a calibration case first
+- measures per-worker fio throughput
+- sizes worker count from the Ceph bandwidth target
+- scales worker count first, then `volumes_per_client`
+
+### `net-many-to-one`
+
+- runs a calibration case first
+- measures aggregate throughput and converts it to per-client rate
+- scales `client_count` first
+- increases `parallel_streams` only after a practical client-count threshold
+
+### `net-ring`
+
+- runs a calibration case first
+- measures aggregate ring throughput and converts it to per-participant rate
+- scales `participant_count` first
+- keeps `neighbors_per_vm=1` by default
+
+### `mixed-pressure`
+
+- does not calibrate independently
+- derives its shape from the level-matched standalone plans
+- keeps exactly one controller floating IP
+
+## Outputs
+
+Each sweep writes:
+
+- `sweeps/<timestamp>/manifest.json`
+- `sweeps/<timestamp>/summary.md`
+- `sweeps/<timestamp>/runs/<scenario>/level-XX/args.yaml`
+
+The manifest records:
+
+- planned sizing
+- Rally task ids
+- status
+- measured key metrics
+- artifact roots
+- calibration results
+
+## Defaults and constraints
+
+- scenarios run sequentially
+- failures are recorded and the sweep continues
+- the default goal is breadth-first scaling
+- network and fio scenarios use live calibration before level sizing
+- the script assumes `.venv` and a Rally deployment already exist

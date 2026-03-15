@@ -95,7 +95,7 @@
 
 ## Task template index
 
-See [tasks/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/tasks/README.md)
+See [tasks/README.md](./tasks/README.md)
 for the direct template-to-scenario mapping.
 
 ## Choosing the right scenario

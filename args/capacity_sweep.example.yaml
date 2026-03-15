@@ -1,0 +1,33 @@
+cluster:
+  total_vcpus: 1248
+  total_ram_gib: 6144
+  geneve_bandwidth_gbps: 200
+  ceph_bandwidth_gbps: 200
+
+levels: [10, 25, 40, 60, 80]
+
+scenarios:
+  - "spiky"
+  - "fio-distributed"
+  - "net-many-to-one"
+  - "net-ring"
+  - "mixed-pressure"
+
+calibration:
+  fio_runtime_seconds: 20
+  net_runtime_seconds: 15
+  net_parallel_streams: 2
+  assumed_rates:
+    fio_worker_gbps: 2.0
+    many_to_one_client_gbps: 10.0
+    ring_participant_gbps: 20.0
+
+limits:
+  max_vm_count: 0
+  max_volume_count: 0
+  max_floating_ips: 1
+
+execution:
+  mode: "generate_and_run"
+  failure_policy: "continue"
+  deployment_name: "sunbeam"

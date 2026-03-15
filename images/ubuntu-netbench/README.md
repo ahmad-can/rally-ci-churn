@@ -22,10 +22,8 @@ openstack image create ubuntu-netbench \
   --file images/ubuntu-netbench/disk.img \
   --disk-format raw \
   --container-format bare \
+  --property hw_firmware_type=uefi \
   --public
-
-openstack image set ubuntu-netbench \
-  --property hw_firmware_type=uefi
 ```
 
 ## Recommended flavor

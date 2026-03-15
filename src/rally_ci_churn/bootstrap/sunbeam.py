@@ -33,6 +33,8 @@ SUPPORTED_PRESETS = {
     "tenant-churn",
 }
 
+PRESET_BUILDERS = {}
+
 
 def _run_openstack(clouds_yaml: Path, cloud_name: str, *args: str) -> str:
     env = os.environ.copy()
@@ -606,6 +608,22 @@ def _write_adminrc(path: Path, admin_cloud: dict[str, object]) -> None:
     path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
+PRESET_BUILDERS = {
+    "smoke": _build_smoke_preset,
+    "steady": _build_steady_preset,
+    "spiky": _build_spiky_preset,
+    "stress-ng": _build_stress_ng_preset,
+    "fio-distributed": _build_fio_distributed_preset,
+    "mixed-pressure": _build_mixed_pressure_preset,
+    "net-many-to-one": _build_net_many_to_one_preset,
+    "net-many-to-one-http": _build_net_many_to_one_http_preset,
+    "net-ring": _build_net_ring_preset,
+    "failure-storm": _build_failure_storm_preset,
+    "quota-edge": _build_quota_edge_preset,
+    "tenant-churn": _build_tenant_churn_preset,
+}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate Sunbeam benchmark args and adminrc.")
     parser.add_argument("--clouds-yaml", required=True)
@@ -613,6 +631,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-args", required=True)
     parser.add_argument("--output-adminrc", required=True)
     return parser
+
+
+def build_preset(
+    preset: str,
+    clouds_yaml: Path,
+    config: dict[str, object],
+) -> tuple[dict[str, object], str]:
+    if preset not in PRESET_BUILDERS:
+        raise RuntimeError(f"Unsupported preset selector: {preset}")
+    return PRESET_BUILDERS[preset](clouds_yaml, config)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -628,23 +656,7 @@ def main(argv: list[str] | None = None) -> int:
             yaml.safe_dump(config, sort_keys=False),
             encoding="utf-8",
         )
-        preset_builders = {
-            "smoke": _build_smoke_preset,
-            "steady": _build_steady_preset,
-            "spiky": _build_spiky_preset,
-            "stress-ng": _build_stress_ng_preset,
-            "fio-distributed": _build_fio_distributed_preset,
-            "mixed-pressure": _build_mixed_pressure_preset,
-            "net-many-to-one": _build_net_many_to_one_preset,
-            "net-many-to-one-http": _build_net_many_to_one_http_preset,
-            "net-ring": _build_net_ring_preset,
-            "failure-storm": _build_failure_storm_preset,
-            "quota-edge": _build_quota_edge_preset,
-            "tenant-churn": _build_tenant_churn_preset,
-        }
-        if args.preset not in preset_builders:
-            raise RuntimeError(f"Unsupported preset selector: {args.preset}")
-        rendered_args, task_path = preset_builders[args.preset](normalized_clouds_yaml, config)
+        rendered_args, task_path = build_preset(args.preset, normalized_clouds_yaml, config)
         output_args.parent.mkdir(parents=True, exist_ok=True)
         output_adminrc.parent.mkdir(parents=True, exist_ok=True)
         output_args.write_text(yaml.safe_dump(rendered_args, sort_keys=False), encoding="utf-8")

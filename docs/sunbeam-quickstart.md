@@ -62,8 +62,22 @@ rally task start tasks/autonomous_vm_waves.yaml.j2 \
 ```
 
 Generated args land under `args/`. See
-[args/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/args/README.md)
+[args/README.md](./args/README.md)
 for the mapping.
+
+## Capacity sweeps
+
+Once the environment is bootstrapped, you can run the percentage-based sweep:
+
+```bash
+./scripts/run_capacity_sweep.sh \
+  --clouds-yaml /home/ubuntu/.config/openstack/clouds.yaml
+```
+
+This reuses the existing presets, calibrates fio and network scenarios, then
+runs the selected load levels sequentially. See
+[sweeps.md](./docs/sweeps.md)
+for the sizing model and output layout.
 
 ## Common pitfalls
 

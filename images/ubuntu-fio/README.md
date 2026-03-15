@@ -25,10 +25,8 @@ openstack image create ubuntu-fio \
   --file images/ubuntu-fio/disk.img \
   --disk-format raw \
   --container-format bare \
+  --property hw_firmware_type=uefi \
   --public
-
-openstack image set ubuntu-fio \
-  --property hw_firmware_type=uefi
 ```
 
 ## Recommended flavor

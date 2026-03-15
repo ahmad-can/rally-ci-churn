@@ -89,3 +89,19 @@ Expected files:
 - use `rally task report <task-id> --out output.html` for human review
 - use `rally task report <task-id> --json --out output.json` for machine-readable export
 - inspect local artifact bundles when you need the raw benchmark data
+
+## Capacity sweep outputs
+
+The sweep runner writes a top-level planning and execution tree:
+
+- `sweeps/<timestamp>/manifest.json`
+- `sweeps/<timestamp>/summary.md`
+- `sweeps/<timestamp>/runs/<scenario>/level-XX/args.yaml`
+
+The sweep manifest records:
+
+- calibration runs and their measured unit rates
+- the generated args file for each scenario and level
+- Rally task ids
+- status and failure messages
+- measured key metrics and artifact roots

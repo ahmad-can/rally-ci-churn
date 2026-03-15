@@ -25,10 +25,8 @@ openstack image create ubuntu-stress-ng \
   --file images/ubuntu-stress-ng/disk.img \
   --disk-format raw \
   --container-format bare \
+  --property hw_firmware_type=uefi \
   --public
-
-openstack image set ubuntu-stress-ng \
-  --property hw_firmware_type=uefi
 ```
 
 ## Recommended flavor

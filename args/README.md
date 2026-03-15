@@ -13,6 +13,7 @@
 - `mixed_pressure.example.yaml`
 - `net_many_to_one.example.yaml`
 - `net_ring.example.yaml`
+- `capacity_sweep.example.yaml`
 
 These are reference shapes, not the preferred Sunbeam operator path.
 

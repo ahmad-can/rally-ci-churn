@@ -87,6 +87,28 @@ Guidance:
   and memory pressure at the same time
 - keep the one-FIP controller invariant unless you are debugging
 
+### Capacity sweep runner
+
+Key knobs:
+
+- `levels`
+- cluster `total_vcpus`
+- cluster `total_ram_gib`
+- cluster `geneve_bandwidth_gbps`
+- cluster `ceph_bandwidth_gbps`
+- optional `max_vm_count`
+- optional `max_volume_count`
+
+Guidance:
+
+- use real cluster totals, not single-node smoke numbers
+- leave bandwidth scenarios on calibration-first sizing unless you have a good
+  reason to override it
+- use `max_vm_count` or `max_volume_count` only as a safety cap, not as the
+  primary sizing input
+- run `--generate-only` first if you want to inspect the generated ladder before
+  launching it
+
 ### Network traffic scenarios
 
 Key knobs:
@@ -112,9 +134,9 @@ Guidance:
 Flavor and image guidance is intentionally split out:
 
 - image strategy:
-  [images.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/images.md)
+  [images.md](./docs/images.md)
 - per-image build/upload/flavor notes:
-  [images/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/images/README.md)
+  [images/README.md](./images/README.md)
 
 ## Result interpretation
 

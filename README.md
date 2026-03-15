@@ -45,24 +45,26 @@ rally task start tasks/autonomous_vm_waves.yaml.j2 \
 - `CIChurn.mixed_pressure`
   - one controller VM driving overlapping fio, network, and spiky stress-ng pressure
 
-Task templates live under [tasks/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/tasks/README.md).
+Task templates live under [tasks/README.md](./tasks/README.md).
 
 ## Documentation map
 
 - Project scope and intended use:
-  [docs/scope.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/scope.md)
+  [docs/scope.md](./docs/scope.md)
 - Sunbeam bootstrap and first run:
-  [docs/sunbeam-quickstart.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/sunbeam-quickstart.md)
+  [docs/sunbeam-quickstart.md](./docs/sunbeam-quickstart.md)
 - Scenario catalog and task mapping:
-  [docs/scenarios.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/scenarios.md)
+  [docs/scenarios.md](./docs/scenarios.md)
 - Benchmark tuning and sizing:
-  [docs/tuning.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/tuning.md)
+  [docs/tuning.md](./docs/tuning.md)
+- Capacity sweep runner:
+  [docs/sweeps.md](./docs/sweeps.md)
 - Image strategy and image recipes:
-  [docs/images.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/images.md)
+  [docs/images.md](./docs/images.md)
 - Rally outputs, artifacts, and result inspection:
-  [docs/outputs.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/outputs.md)
+  [docs/outputs.md](./docs/outputs.md)
 - Full docs index:
-  [docs/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/README.md)
+  [docs/README.md](./docs/README.md)
 
 ## Repo map
 
@@ -86,12 +88,14 @@ Task templates live under [tasks/README.md](/home/guillaume.boutry@canonical.com
 Canonical entrypoints:
 
 - bootstrap:
-  [scripts/setup_uv.sh](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/scripts/setup_uv.sh)
+  [scripts/setup_uv.sh](./scripts/setup_uv.sh)
+- sweep runner:
+  [scripts/run_capacity_sweep.sh](./scripts/run_capacity_sweep.sh)
 - scenario code:
-  [src/rally_ci_churn/plugins](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/src/rally_ci_churn/plugins)
+  [src/rally_ci_churn/plugins](./src/rally_ci_churn/plugins)
 - task templates:
-  [tasks/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/tasks/README.md)
+  [tasks/README.md](./tasks/README.md)
 - image recipes:
-  [images/README.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/images/README.md)
+  [images/README.md](./images/README.md)
 - outputs and artifacts:
-  [docs/outputs.md](/home/guillaume.boutry@canonical.com/Documents/canonical/projects/openstack/rally-ci-churn/docs/outputs.md)
+  [docs/outputs.md](./docs/outputs.md)

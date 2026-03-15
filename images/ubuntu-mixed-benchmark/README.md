@@ -29,10 +29,8 @@ openstack image create ubuntu-mixed-benchmark \
   --file images/ubuntu-mixed-benchmark/disk.img \
   --disk-format raw \
   --container-format bare \
+  --property hw_firmware_type=uefi \
   --public
-
-openstack image set ubuntu-mixed-benchmark \
-  --property hw_firmware_type=uefi
 ```
 
 ## Recommended flavors

@@ -122,7 +122,7 @@ def _build_base_args(clouds_yaml: Path, config: dict[str, object]) -> dict[str, 
     flavor_names = _run_openstack(clouds_yaml, "sunbeam-admin", "flavor", "list", "-f", "value", "-c", "Name").splitlines()
     external_networks = _run_openstack(clouds_yaml, "sunbeam-admin", "network", "list", "--external", "-f", "value", "-c", "Name").splitlines()
     image_name = _pick_exact_or_prefix([name for name in image_names if name], ("ubuntu",), "ubuntu")
-    flavor_name = _pick_exact_or_prefix([name for name in flavor_names if name], ("m1.tiny", "m1.small"), "m1.")
+    flavor_name = _pick_exact_or_prefix([name for name in flavor_names if name], ("m1.benchmark", "m1.tiny", "m1.small"), "m1.")
     if "external-network" in external_networks:
         external_network = "external-network"
     elif len([name for name in external_networks if name]) == 1:

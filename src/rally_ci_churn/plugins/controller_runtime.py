@@ -26,6 +26,8 @@ SSH_PORT = 22
 ATTACH_RETRY_COUNT = 5
 ATTACH_RETRY_DELAY_SECONDS = 5.0
 VOLUME_POLL_INTERVAL_SECONDS = 2.0
+HTTP_POOL_BASE_SIZE = 10
+HTTP_POOL_HEADROOM = 4
 
 T = TypeVar("T")
 
@@ -53,6 +55,49 @@ def build_root_volume_boot(
 
 
 class ParallelBootMixin:
+    def _ensure_http_pool_capacity(self, concurrency: int) -> None:
+        if concurrency <= 1:
+            return
+
+        target_size = max(HTTP_POOL_BASE_SIZE, int(concurrency) + HTTP_POOL_HEADROOM)
+        clients = getattr(self, "_clients", None)
+        if clients is None:
+            return
+
+        try:
+            keystone_session = clients.keystone.get_session()[0]
+        except Exception:
+            return
+
+        self._resize_session_adapters(keystone_session, target_size)
+
+    def _resize_session_adapters(self, keystone_session, target_size: int) -> None:
+        from requests import adapters as requests_adapters
+
+        for scheme, adapter in list(keystone_session.adapters.items()):
+            if not isinstance(adapter, requests_adapters.HTTPAdapter):
+                continue
+
+            current_pool_connections = int(
+                getattr(adapter, "_pool_connections", HTTP_POOL_BASE_SIZE)
+            )
+            current_pool_maxsize = int(
+                getattr(adapter, "_pool_maxsize", HTTP_POOL_BASE_SIZE)
+            )
+            if (
+                current_pool_connections >= target_size
+                and current_pool_maxsize >= target_size
+            ):
+                continue
+
+            replacement = adapter.__class__(
+                pool_connections=max(current_pool_connections, target_size),
+                pool_maxsize=max(current_pool_maxsize, target_size),
+                max_retries=adapter.max_retries,
+                pool_block=getattr(adapter, "_pool_block", False),
+            )
+            keystone_session.mount(scheme, replacement)
+
     def _resolve_boot_concurrency(
         self,
         count: int,
@@ -95,6 +140,8 @@ class ParallelBootMixin:
         )
         if resolved == 0:
             return
+
+        self._ensure_http_pool_capacity(resolved)
 
         ordered_results: dict[int, T] = {}
         first_error: Exception | None = None
@@ -139,6 +186,8 @@ class ParallelBootMixin:
         )
         if resolved == 0:
             return
+
+        self._ensure_http_pool_capacity(resolved)
 
         created_by_index: dict[int, object] = {}
         create_error: Exception | None = None

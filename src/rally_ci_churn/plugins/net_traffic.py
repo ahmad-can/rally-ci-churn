@@ -240,7 +240,7 @@ runcmd:
             **boot_kwargs,
         )
 
-    def _wait_for_volume_status(self, volume_id: str, statuses: list[str], timeout_seconds: int = 600):
+    def _wait_for_volume_status(self, volume_id: str, statuses: list[str], timeout_seconds: int = 1800):
         deadline = time.monotonic() + timeout_seconds
         volume = None
         while time.monotonic() < deadline:

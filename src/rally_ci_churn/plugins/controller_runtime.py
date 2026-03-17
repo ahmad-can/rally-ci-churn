@@ -367,7 +367,7 @@ class ControllerRuntimeBase(ParallelBootMixin, vm_utils.VMScenario):
         self._add_security_group_rule(security_group["id"], "icmp", remote_ip_prefix=tenant_cidr)
         return security_group
 
-    def _wait_for_volume_status(self, volume_id: str, statuses: list[str], timeout_seconds: int = 600):
+    def _wait_for_volume_status(self, volume_id: str, statuses: list[str], timeout_seconds: int = 1800):
         deadline = time.monotonic() + timeout_seconds
         volume = None
         while time.monotonic() < deadline:

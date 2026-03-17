@@ -27,6 +27,22 @@ BUILTIN_PROFILES = {
             "log_avg_msec": "1000",
         },
     },
+    "throughput-seqwrite": {
+        "rw_mode": "write",
+        "block_size": "1M",
+        "job_name": "throughput-seqwrite",
+        "global_options": {
+            "log_avg_msec": "1000",
+        },
+    },
+    "latency-randwrite": {
+        "rw_mode": "randwrite",
+        "block_size": "4k",
+        "job_name": "latency-randwrite",
+        "global_options": {
+            "log_avg_msec": "1000",
+        },
+    },
 }
 
 

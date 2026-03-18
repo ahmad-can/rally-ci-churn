@@ -285,10 +285,15 @@ def main() -> int:
         selected_workers = workers[:client_nodes]
         case_id = str(case["case_id"])
         case_job = output_dir / f"{case_id}.fio"
+        hostfile = output_dir / f"{case_id}.clients"
+        hostfile.write_text(
+            "\n".join(f"{worker['fixed_ip']},{fio_port}" for worker in selected_workers) + "\n",
+            encoding="utf-8",
+        )
         remote_args = [
             "fio",
             "--output-format=json+",
-            *[f"--client={worker['fixed_ip']},{fio_port}" for worker in selected_workers],
+            f"--client={hostfile}",
         ]
 
         slice_key = (client_nodes, volumes_per_client)

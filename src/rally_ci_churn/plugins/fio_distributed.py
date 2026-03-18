@@ -20,6 +20,8 @@ from rally_openstack.task import scenario
 from rally_ci_churn.plugins.controller_runtime import ControllerRuntimeBase
 from rally_ci_churn.plugins.controller_runtime import SSH_PORT
 from rally_ci_churn.plugins.controller_runtime import build_root_volume_boot
+from rally_ci_churn.results import as_int_list
+from rally_ci_churn.results import as_str_list
 from rally_ci_churn.results import build_artifacts_output
 from rally_ci_churn.results import build_metrics_output
 from rally_ci_churn.results import build_phase_output
@@ -32,14 +34,6 @@ from rally_ci_churn.results import summarize_numeric_series
 DEFAULT_FIO_PORT = 8765
 DEVICE_POLL_INTERVAL_SECONDS = 2.0
 WORKER_READY_TIMEOUT_SECONDS = 600
-
-
-def _as_int_list(values: list[object]) -> list[int]:
-    return [int(value) for value in values]
-
-
-def _as_str_list(values: list[object]) -> list[str]:
-    return [str(value) for value in values]
 
 
 BUILTIN_FIO_PROFILES = {
@@ -604,13 +598,13 @@ class FioDistributedScenario(_FioDistributedBase):
         artifacts_root_dir="artifacts",
         worker_ready_timeout_seconds=WORKER_READY_TIMEOUT_SECONDS,
     ):
-        client_counts = _as_int_list(client_counts or [1, 2])
-        volumes_per_client = _as_int_list(volumes_per_client or [1])
-        profile_names = _as_str_list(profile_names or [])
-        rw_modes = _as_str_list(rw_modes or ["write", "read"])
-        block_sizes = _as_str_list(block_sizes or ["1M"])
-        numjobs = _as_int_list(numjobs or [1, 2])
-        iodepths = _as_int_list(iodepths or [1, 32])
+        client_counts = as_int_list(client_counts or [1, 2])
+        volumes_per_client = as_int_list(volumes_per_client or [1])
+        profile_names = as_str_list(profile_names or [])
+        rw_modes = as_str_list(rw_modes or ["write", "read"])
+        block_sizes = as_str_list(block_sizes or ["1M"])
+        numjobs = as_int_list(numjobs or [1, 2])
+        iodepths = as_int_list(iodepths or [1, 32])
         volume_size_gib = int(volume_size_gib)
         runtime_seconds = int(runtime_seconds)
         ramp_time_seconds = int(ramp_time_seconds)

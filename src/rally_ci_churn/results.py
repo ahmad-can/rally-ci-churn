@@ -10,6 +10,14 @@ from statistics import median
 RESULT_PREFIX = "RALLY_CI_RESULT="
 
 
+def as_int_list(values: list[object]) -> list[int]:
+    return [int(value) for value in values]
+
+
+def as_str_list(values: list[object]) -> list[str]:
+    return [str(value) for value in values]
+
+
 def format_markdown_table(
     headers: list[str],
     rows: list[list[object]],

@@ -23,6 +23,8 @@ from rally_openstack.task.scenarios.vm import utils as vm_utils
 
 from rally_ci_churn.plugins.controller_runtime import ParallelBootMixin
 from rally_ci_churn.plugins.controller_runtime import build_root_volume_boot
+from rally_ci_churn.results import as_int_list
+from rally_ci_churn.results import as_str_list
 from rally_ci_churn.results import build_artifacts_output
 from rally_ci_churn.results import build_metrics_output
 from rally_ci_churn.results import build_phase_output
@@ -37,14 +39,6 @@ HTTP_PORT = 8080
 ATTACH_RETRY_COUNT = 5
 ATTACH_RETRY_DELAY_SECONDS = 5.0
 VOLUME_POLL_INTERVAL_SECONDS = 2.0
-
-
-def _as_int_list(values: list[object]) -> list[int]:
-    return [int(value) for value in values]
-
-
-def _as_str_list(values: list[object]) -> list[str]:
-    return [str(value) for value in values]
 
 
 class _NetTrafficBase(ParallelBootMixin, vm_utils.VMScenario):
@@ -461,9 +455,9 @@ class NetManyToOneScenario(_NetTrafficBase):
         http_file_size_mib=128,
         artifacts_root_dir="artifacts",
     ):
-        protocols = _as_str_list(protocols or ["tcp", "udp"])
-        parallel_streams = _as_int_list(parallel_streams or [4])
-        udp_target_mbps = _as_int_list(udp_target_mbps or [500])
+        protocols = as_str_list(protocols or ["tcp", "udp"])
+        parallel_streams = as_int_list(parallel_streams or [4])
+        udp_target_mbps = as_int_list(udp_target_mbps or [500])
         client_count = int(client_count)
         ssh_connect_timeout_seconds = int(ssh_connect_timeout_seconds)
         command_timeout_seconds = int(command_timeout_seconds)
@@ -767,9 +761,9 @@ class NetRingScenario(_NetTrafficBase):
         udp_target_mbps=None,
         artifacts_root_dir="artifacts",
     ):
-        protocols = _as_str_list(protocols or ["tcp", "udp"])
-        parallel_streams = _as_int_list(parallel_streams or [4])
-        udp_target_mbps = _as_int_list(udp_target_mbps or [300])
+        protocols = as_str_list(protocols or ["tcp", "udp"])
+        parallel_streams = as_int_list(parallel_streams or [4])
+        udp_target_mbps = as_int_list(udp_target_mbps or [300])
         participant_count = int(participant_count)
         ssh_connect_timeout_seconds = int(ssh_connect_timeout_seconds)
         command_timeout_seconds = int(command_timeout_seconds)

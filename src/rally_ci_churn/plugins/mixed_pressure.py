@@ -24,6 +24,9 @@ from rally_ci_churn.plugins.autonomous_vm import _AutonomousVMBase
 from rally_ci_churn.plugins.controller_runtime import ControllerRuntimeBase
 from rally_ci_churn.plugins.controller_runtime import SSH_PORT
 from rally_ci_churn.plugins.controller_runtime import build_root_volume_boot
+from rally_ci_churn.plugins.fio_distributed import BUILTIN_FIO_PROFILES
+from rally_ci_churn.results import as_int_list
+from rally_ci_churn.results import as_str_list
 from rally_ci_churn.results import build_artifacts_output
 from rally_ci_churn.results import build_metrics_output
 from rally_ci_churn.results import build_phase_output
@@ -35,14 +38,6 @@ from rally_ci_churn.results import summarize_numeric_series
 
 DEVICE_POLL_INTERVAL_SECONDS = 2.0
 WORKER_READY_TIMEOUT_SECONDS = 600
-
-
-def _as_int_list(values: list[object]) -> list[int]:
-    return [int(value) for value in values]
-
-
-def _as_str_list(values: list[object]) -> list[str]:
-    return [str(value) for value in values]
 
 
 class _MixedPressureBase(ControllerRuntimeBase, _AutonomousVMBase):
@@ -728,19 +723,19 @@ class MixedPressureScenario(_MixedPressureBase):
         **kwargs,
     ):
         churn_workload_params = dict(churn_workload_params or {})
-        fio_client_counts = _as_int_list(fio_client_counts or [1])
-        fio_volumes_per_client = _as_int_list(fio_volumes_per_client or [1])
-        fio_profile_names = _as_str_list(fio_profile_names or ["mixed-workload"])
-        fio_rw_modes = _as_str_list(fio_rw_modes or ["write"])
-        fio_block_sizes = _as_str_list(fio_block_sizes or ["1M"])
-        fio_numjobs = _as_int_list(fio_numjobs or [1])
-        fio_iodepths = _as_int_list(fio_iodepths or [1])
-        many_protocols = _as_str_list(many_protocols or ["tcp"])
-        many_parallel_streams = _as_int_list(many_parallel_streams or [2])
-        many_udp_target_mbps = _as_int_list(many_udp_target_mbps or [500])
-        ring_protocols = _as_str_list(ring_protocols or ["tcp"])
-        ring_parallel_streams = _as_int_list(ring_parallel_streams or [2])
-        ring_udp_target_mbps = _as_int_list(ring_udp_target_mbps or [300])
+        fio_client_counts = as_int_list(fio_client_counts or [1])
+        fio_volumes_per_client = as_int_list(fio_volumes_per_client or [1])
+        fio_profile_names = as_str_list(fio_profile_names or ["mixed-workload"])
+        fio_rw_modes = as_str_list(fio_rw_modes or ["write"])
+        fio_block_sizes = as_str_list(fio_block_sizes or ["1M"])
+        fio_numjobs = as_int_list(fio_numjobs or [1])
+        fio_iodepths = as_int_list(fio_iodepths or [1])
+        many_protocols = as_str_list(many_protocols or ["tcp"])
+        many_parallel_streams = as_int_list(many_parallel_streams or [2])
+        many_udp_target_mbps = as_int_list(many_udp_target_mbps or [500])
+        ring_protocols = as_str_list(ring_protocols or ["tcp"])
+        ring_parallel_streams = as_int_list(ring_parallel_streams or [2])
+        ring_udp_target_mbps = as_int_list(ring_udp_target_mbps or [300])
         burst_windows = self._validate_burst_windows(burst_windows or [])
         duration_seconds = int(duration_seconds)
         max_active_vms = int(max_active_vms)
@@ -921,23 +916,9 @@ class MixedPressureScenario(_MixedPressureBase):
                 ],
             }
             fio_cases = []
-            builtin_profiles = {
-                "mixed-workload": {
-                    "rw_mode": "randrw",
-                    "block_size": "64k",
-                    "job_name": "mixed-workload",
-                    "profile_options": {"rwmixread": "50", "log_avg_msec": "1000"},
-                },
-                "db-workload": {
-                    "rw_mode": "randrw",
-                    "block_size": "4k",
-                    "job_name": "db-workload",
-                    "profile_options": {"rwmixread": "70", "random_distribution": "zipf:0.99", "log_avg_msec": "1000"},
-                },
-            }
             profile_defs = []
             for profile_name in fio_profile_names:
-                profile = builtin_profiles.get(profile_name)
+                profile = BUILTIN_FIO_PROFILES.get(profile_name)
                 if profile is None:
                     raise rally_exceptions.ScriptError(message=f"Unknown fio profile {profile_name}")
                 profile_defs.append({"profile_name": profile_name, **profile})

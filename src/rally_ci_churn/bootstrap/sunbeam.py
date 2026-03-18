@@ -46,20 +46,6 @@ def cloud_overrides(
 
 
 DEFAULT_PRESET = "smoke"
-SUPPORTED_PRESETS = {
-    "smoke",
-    "steady",
-    "spiky",
-    "stress-ng",
-    "fio-distributed",
-    "mixed-pressure",
-    "net-many-to-one",
-    "net-many-to-one-http",
-    "net-ring",
-    "failure-storm",
-    "quota-edge",
-    "tenant-churn",
-}
 
 PRESET_BUILDERS = {}
 
@@ -376,7 +362,7 @@ def _pick_custom_image(clouds_yaml: Path, desired_name: str) -> str:
     if "image" in _cloud_overrides:
         return _cloud_overrides["image"]
     image_names = _run_openstack(
-        clouds_yaml, "sunbeam-admin", "image", "list", "-f", "value", "-c", "Name"
+        clouds_yaml, _active_admin_cloud_name, "image", "list", "-f", "value", "-c", "Name"
     ).splitlines()
     if desired_name in image_names:
         return desired_name
@@ -389,7 +375,7 @@ def _pick_preferred_flavor(clouds_yaml: Path, preferred: tuple[str, ...], fallba
     if "flavor" in _cloud_overrides:
         return _cloud_overrides["flavor"]
     flavor_names = _run_openstack(
-        clouds_yaml, "sunbeam-admin", "flavor", "list", "-f", "value", "-c", "Name"
+        clouds_yaml, _active_admin_cloud_name, "flavor", "list", "-f", "value", "-c", "Name"
     ).splitlines()
     return _pick_exact_or_prefix([name for name in flavor_names if name], preferred, fallback_prefix)
 
@@ -1221,14 +1207,14 @@ PRESET_DEFINITIONS = {
     ),
 }
 
-if set(PRESET_DEFINITIONS) != SUPPORTED_PRESETS:
-    raise RuntimeError("Preset definitions must stay in sync with SUPPORTED_PRESETS.")
+if set(PRESET_DEFINITIONS) != set(PRESET_BUILDERS):
+    raise RuntimeError("PRESET_DEFINITIONS keys must match PRESET_BUILDERS keys.")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate benchmark args and adminrc.")
     parser.add_argument("--clouds-yaml", required=True)
-    parser.add_argument("--preset", default=DEFAULT_PRESET, choices=sorted(SUPPORTED_PRESETS))
+    parser.add_argument("--preset", default=DEFAULT_PRESET, choices=sorted(PRESET_DEFINITIONS))
     parser.add_argument("--output-args", required=True)
     parser.add_argument("--output-adminrc", required=True)
     parser.add_argument(

@@ -120,8 +120,8 @@ def _read_direction_stats(payload: dict[str, object], rw_mode: str) -> dict[str,
         directions = ["read", "write"]
     else:
         directions = ["read" if "read" in rw_mode else "write"]
-    bandwidth = 0.0
-    iops = 0.0
+    bw_per_client: list[float] = []
+    iops_per_client: list[float] = []
     latencies_ms: list[float] = []
     p99_ms = 0.0
     for job in entries:
@@ -129,12 +129,14 @@ def _read_direction_stats(payload: dict[str, object], rw_mode: str) -> dict[str,
             continue
         if job.get("jobname") == "All clients":
             continue
+        client_bw = 0.0
+        client_iops = 0.0
         for direction in directions:
             stats = job.get(direction, {})
             if not isinstance(stats, dict):
                 continue
-            bandwidth += float(stats.get("bw_bytes", 0.0))
-            iops += float(stats.get("iops", 0.0))
+            client_bw += float(stats.get("bw_bytes", 0.0))
+            client_iops += float(stats.get("iops", 0.0))
             clat_ns = stats.get("clat_ns", {})
             if isinstance(clat_ns, dict):
                 if "mean" in clat_ns:
@@ -144,10 +146,21 @@ def _read_direction_stats(payload: dict[str, object], rw_mode: str) -> dict[str,
                     p99_raw = percentiles.get("99.000000") or percentiles.get("99.00")
                     if p99_raw:
                         p99_ms = max(p99_ms, float(p99_raw) / 1_000_000.0)
+        bw_per_client.append(client_bw)
+        iops_per_client.append(client_iops)
     average_latency = sum(latencies_ms) / len(latencies_ms) if latencies_ms else 0.0
+    bw_sum = sum(bw_per_client)
+    iops_sum = sum(iops_per_client)
+    n = len(bw_per_client) or 1
     return {
-        "throughput_bytes_per_sec": bandwidth,
-        "iops": iops,
+        "bw_sum": bw_sum,
+        "bw_avg": bw_sum / n,
+        "bw_max": max(bw_per_client) if bw_per_client else 0.0,
+        "bw_min": min(bw_per_client) if bw_per_client else 0.0,
+        "iops_sum": iops_sum,
+        "iops_avg": iops_sum / n,
+        "iops_max": max(iops_per_client) if iops_per_client else 0.0,
+        "iops_min": min(iops_per_client) if iops_per_client else 0.0,
         "avg_latency_ms": average_latency,
         "p99_latency_ms": p99_ms,
     }
@@ -311,15 +324,21 @@ def _format_markdown_table(
 def _write_summary_markdown(output_dir: Path, rows: list[dict[str, object]]) -> None:
     headers = [
         "Client Nodes", "Volumes/Client", "Total Volumes", "Profile", "RW",
-        "Block Size", "NumJobs", "IoDepth", "Throughput (BW)", "IOPS",
+        "Block Size", "NumJobs", "IoDepth",
+        "BW Sum", "BW Avg", "BW Max", "BW Min",
+        "IOPS Sum", "IOPS Avg", "IOPS Max", "IOPS Min",
         "Avg Latency (ms)", "99th Percentile Latency (ms)",
     ]
     table_rows = [
         [
             row["client_nodes"], row["volumes_per_client"], row["total_volumes"],
             row["profile_name"], row["rw_mode"], row["block_size"],
-            row["numjobs"], row["iodepth"], row["throughput_human"],
-            row["iops_human"], f"{row['avg_latency_ms']:.2f}",
+            row["numjobs"], row["iodepth"],
+            row["bw_sum_human"], row["bw_avg_human"],
+            row["bw_max_human"], row["bw_min_human"],
+            row["iops_sum_human"], row["iops_avg_human"],
+            row["iops_max_human"], row["iops_min_human"],
+            f"{row['avg_latency_ms']:.2f}",
             f"{row['p99_latency_ms']:.2f}",
         ]
         for row in rows
@@ -444,10 +463,22 @@ def main() -> int:
                 "block_size": case["block_size"],
                 "numjobs": int(case["numjobs"]),
                 "iodepth": int(case["iodepth"]),
-                "throughput_bytes_per_sec": stats["throughput_bytes_per_sec"],
-                "throughput_human": _human_bw(float(stats["throughput_bytes_per_sec"])),
-                "iops": round(float(stats["iops"]), 2),
-                "iops_human": _human_iops(float(stats["iops"])),
+                "bw_sum": stats["bw_sum"],
+                "bw_avg": stats["bw_avg"],
+                "bw_max": stats["bw_max"],
+                "bw_min": stats["bw_min"],
+                "bw_sum_human": _human_bw(float(stats["bw_sum"])),
+                "bw_avg_human": _human_bw(float(stats["bw_avg"])),
+                "bw_max_human": _human_bw(float(stats["bw_max"])),
+                "bw_min_human": _human_bw(float(stats["bw_min"])),
+                "iops_sum": round(float(stats["iops_sum"]), 2),
+                "iops_avg": round(float(stats["iops_avg"]), 2),
+                "iops_max": round(float(stats["iops_max"]), 2),
+                "iops_min": round(float(stats["iops_min"]), 2),
+                "iops_sum_human": _human_iops(float(stats["iops_sum"])),
+                "iops_avg_human": _human_iops(float(stats["iops_avg"])),
+                "iops_max_human": _human_iops(float(stats["iops_max"])),
+                "iops_min_human": _human_iops(float(stats["iops_min"])),
                 "avg_latency_ms": round(float(stats["avg_latency_ms"]), 2),
                 "p99_latency_ms": round(float(stats["p99_latency_ms"]), 2),
             }
@@ -463,7 +494,7 @@ def main() -> int:
     (output_dir / "summary.csv").write_text(
         "\n".join(
             [
-                "case_id,client_nodes,volumes_per_client,total_volumes,profile_name,rw_mode,block_size,numjobs,iodepth,throughput_bytes_per_sec,iops,avg_latency_ms,p99_latency_ms"
+                "case_id,client_nodes,volumes_per_client,total_volumes,profile_name,rw_mode,block_size,numjobs,iodepth,bw_sum,bw_avg,bw_max,bw_min,iops_sum,iops_avg,iops_max,iops_min,avg_latency_ms,p99_latency_ms"
             ]
             + [
                 ",".join(
@@ -477,8 +508,14 @@ def main() -> int:
                         str(row["block_size"]),
                         str(row["numjobs"]),
                         str(row["iodepth"]),
-                        str(row["throughput_bytes_per_sec"]),
-                        str(row["iops"]),
+                        str(row["bw_sum"]),
+                        str(row["bw_avg"]),
+                        str(row["bw_max"]),
+                        str(row["bw_min"]),
+                        str(row["iops_sum"]),
+                        str(row["iops_avg"]),
+                        str(row["iops_max"]),
+                        str(row["iops_min"]),
                         str(row["avg_latency_ms"]),
                         str(row["p99_latency_ms"]),
                     ]

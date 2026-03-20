@@ -496,8 +496,8 @@ runcmd:
         fio_rows = [row for row in fio_summary.get("rows", []) if isinstance(row, dict)]
         many_rows = [row for row in many_summary.get("rows", []) if isinstance(row, dict)]
         ring_rows = [row for row in ring_summary.get("rows", []) if isinstance(row, dict)]
-        fio_best = max((float(row.get("throughput_bytes_per_sec", 0.0)) for row in fio_rows), default=0.0)
-        fio_median = float(summarize_numeric_series([float(row.get("throughput_bytes_per_sec", 0.0)) for row in fio_rows]).get("p50", 0.0))
+        fio_best = max((float(row.get("bw_sum", 0.0)) for row in fio_rows), default=0.0)
+        fio_median = float(summarize_numeric_series([float(row.get("bw_sum", 0.0)) for row in fio_rows]).get("p50", 0.0))
         fio_worst_p99 = max((float(row.get("p99_latency_ms", 0.0)) for row in fio_rows), default=0.0)
         many_best = max((float(row.get("throughput_mbps", 0.0)) for row in many_rows), default=0.0)
         many_retransmits = sum(float(row.get("retransmits", 0.0)) for row in many_rows)

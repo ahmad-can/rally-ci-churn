@@ -445,8 +445,8 @@ runcmd:
                     row.get("block_size", ""),
                     row.get("numjobs", ""),
                     row.get("iodepth", ""),
-                    row.get("throughput_human", ""),
-                    row.get("iops_human", ""),
+                    row.get("bw_sum_human", ""),
+                    row.get("iops_sum_human", ""),
                     row.get("avg_latency_ms", ""),
                     row.get("p99_latency_ms", ""),
                 ]
@@ -473,12 +473,12 @@ runcmd:
         if not isinstance(rows, list) or not rows:
             return []
         throughput_values = [
-            float(row.get("throughput_bytes_per_sec", 0.0))
+            float(row.get("bw_sum", 0.0))
             for row in rows
             if isinstance(row, dict)
         ]
         iops_values = [
-            float(row.get("iops", 0.0))
+            float(row.get("iops_sum", 0.0))
             for row in rows
             if isinstance(row, dict)
         ]

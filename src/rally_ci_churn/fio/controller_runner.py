@@ -166,7 +166,11 @@ def _read_direction_stats(payload: dict[str, object], rw_mode: str) -> dict[str,
     }
 
 
-def _per_client_stats(payload: dict[str, object], rw_mode: str) -> list[dict[str, object]]:
+def _per_client_stats(
+    payload: dict[str, object],
+    rw_mode: str,
+    ip_to_host: dict[str, str] | None = None,
+) -> list[dict[str, object]]:
     jobs = payload.get("jobs", [])
     client_stats = payload.get("client_stats", [])
     entries = jobs if isinstance(jobs, list) and jobs else client_stats if isinstance(client_stats, list) else []
@@ -181,6 +185,7 @@ def _per_client_stats(payload: dict[str, object], rw_mode: str) -> list[dict[str
         if job.get("jobname") == "All clients":
             continue
         hostname = str(job.get("hostname", "unknown"))
+        compute_host = (ip_to_host or {}).get(hostname, "")
         jobname = str(job.get("jobname", ""))
         bw = 0.0
         client_iops = 0.0
@@ -207,6 +212,7 @@ def _per_client_stats(payload: dict[str, object], rw_mode: str) -> list[dict[str
         avg_lat = lat_sum / lat_count if lat_count else 0.0
         rows.append({
             "hostname": hostname,
+            "compute_host": compute_host,
             "jobname": jobname,
             "bw": bw,
             "iops": client_iops,
@@ -415,10 +421,10 @@ def _write_summary_markdown(output_dir: Path, rows: list[dict[str, object]]) -> 
         )
         client_details = row.get("client_details", [])
         if client_details:
-            client_headers = ["Hostname", "Job", "BW", "IOPS", "Avg Latency (ms)", "P99 Latency (ms)"]
+            client_headers = ["Hostname", "Compute Host", "Job", "BW", "IOPS", "Avg Latency (ms)", "P99 Latency (ms)"]
             client_rows = [
                 [
-                    c["hostname"], c["jobname"],
+                    c["hostname"], c.get("compute_host", ""), c["jobname"],
                     _human_bw(float(c["bw"])),
                     _human_iops(float(c["iops"])),
                     f"{c['avg_latency_ms']:.2f}",
@@ -453,6 +459,7 @@ def main() -> int:
 
     workers = inventory["workers"]
     fio_port = int(inventory["fio_port"])
+    ip_to_host = {w["fixed_ip"]: w.get("compute_host", "") for w in workers}
     results: list[dict[str, object]] = []
     prefilled_slices: set[tuple[int, int]] = set()
 
@@ -525,7 +532,7 @@ def main() -> int:
                 json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8",
             )
         stats = _read_direction_stats(payload, str(case["rw_mode"]))
-        client_details = _per_client_stats(payload, str(case["rw_mode"]))
+        client_details = _per_client_stats(payload, str(case["rw_mode"]), ip_to_host)
         results.append(
             {
                 "case_id": case_id,

@@ -363,6 +363,7 @@ runcmd:
                 {
                     "name": worker["server"].name,
                     "fixed_ip": worker["fixed_ip"],
+                    "compute_host": getattr(worker["server"], "OS-EXT-SRV-ATTR:host", ""),
                     "devices": [
                         f"/var/lib/rally-fio/devices/vol{index + 1:02d}"
                         for index in range(max_volumes_per_client)

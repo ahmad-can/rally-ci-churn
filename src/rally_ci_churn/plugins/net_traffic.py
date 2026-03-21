@@ -555,9 +555,13 @@ class NetManyToOneScenario(_NetTrafficBase):
             else:
                 matrix_cases.append({"case_id": "http-volume", "mode": "http_volume", "protocol": "http"})
 
-            server = self.clients("nova").servers.get(server.id)
+            try:
+                nova_admin = self.admin_clients("nova")
+            except Exception:
+                nova_admin = self.clients("nova")
+            server = nova_admin.servers.get(server.id)
             for client in clients:
-                client["server"] = self.clients("nova").servers.get(client["server"].id)
+                client["server"] = nova_admin.servers.get(client["server"].id)
             inventory = {
                 "ssh_user": ssh_user,
                 "server": {
@@ -864,8 +868,12 @@ class NetRingScenario(_NetTrafficBase):
                                 "udp_target_mbps": int(target),
                             }
                         )
+            try:
+                nova_admin = self.admin_clients("nova")
+            except Exception:
+                nova_admin = self.clients("nova")
             for participant in participants:
-                participant["server"] = self.clients("nova").servers.get(participant["server"].id)
+                participant["server"] = nova_admin.servers.get(participant["server"].id)
             inventory = {
                 "ssh_user": ssh_user,
                 "participants": [

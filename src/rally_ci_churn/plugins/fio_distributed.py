@@ -707,8 +707,12 @@ class FioDistributedScenario(_FioDistributedBase):
                     iodepths,
                 ),
             }
+            try:
+                nova_admin = self.admin_clients("nova")
+            except Exception:
+                nova_admin = self.clients("nova")
             for worker in workers:
-                worker["server"] = self.clients("nova").servers.get(worker["server"].id)
+                worker["server"] = nova_admin.servers.get(worker["server"].id)
             inventory = self._inventory_payload(workers, fio_port, max_volumes_per_client)
             self._upload_controller_inputs(
                 ssh,

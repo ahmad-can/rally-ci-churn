@@ -904,8 +904,12 @@ class MixedPressureScenario(_MixedPressureBase):
                 ssh, fio_workers, fio_port, worker_ready_timeout_seconds
             )
 
+            try:
+                nova_admin = self.admin_clients("nova")
+            except Exception:
+                nova_admin = self.clients("nova")
             for worker in fio_workers:
-                worker["server"] = self.clients("nova").servers.get(worker["server"].id)
+                worker["server"] = nova_admin.servers.get(worker["server"].id)
             fio_inventory = {
                 "fio_port": fio_port,
                 "workers": [
@@ -960,9 +964,9 @@ class MixedPressureScenario(_MixedPressureBase):
                 "ioengine": fio_ioengine,
                 "cases": fio_cases,
             }
-            many_server = self.clients("nova").servers.get(many_server.id)
+            many_server = nova_admin.servers.get(many_server.id)
             for client in many_clients:
-                client["server"] = self.clients("nova").servers.get(client["server"].id)
+                client["server"] = nova_admin.servers.get(client["server"].id)
             many_inventory = {
                 "ssh_user": ssh_user,
                 "server": {
@@ -1025,7 +1029,7 @@ class MixedPressureScenario(_MixedPressureBase):
                 "cases": many_cases,
             }
             for participant in ring_participants:
-                participant["server"] = self.clients("nova").servers.get(participant["server"].id)
+                participant["server"] = nova_admin.servers.get(participant["server"].id)
             ring_inventory = {
                 "ssh_user": ssh_user,
                 "participants": [

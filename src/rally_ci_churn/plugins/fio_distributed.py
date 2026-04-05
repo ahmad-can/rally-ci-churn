@@ -633,6 +633,12 @@ class FioDistributedScenario(_FioDistributedBase):
         summary_payload: dict[str, object] | None = None
         controller_remote_dir = f"/var/lib/rally-fio/run/{uuid.uuid4().hex}"
 
+        key_path = artifacts_dir / "id_rsa"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        key_path.write_text(keypair["private"], encoding="utf-8")
+        key_path.chmod(0o600)
+        print(f"[rally-ci] SSH key saved to: {key_path}", flush=True)
+
         try:
             controller, controller_fip = self._boot_controller(
                 controller_image,
